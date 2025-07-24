@@ -325,15 +325,22 @@ export async function saveOnboardingTrack(trackData: Omit<OnboardingTrack, 'id' 
         createdAt: new Date().toISOString(),
     };
     MOCK_ONBOARDING_TRACKS.push(newTrack);
-    console.log(`Saved track with ID: ${newTrack.id}, Current Tracks:`, MOCK_ONBOARDING_TRACKS);
+    console.log(`Saved track with ID: ${newTrack.id}, Current Tracks:`, MOCK_ONBOARDING_TRACKS.map(t => t.id));
     return newTrack.id!;
 }
 
 export async function getOnboardingTrackById(trackId: string): Promise<OnboardingTrack | null> {
     console.log(`Fetching onboarding track with ID: ${trackId}`);
     const track = MOCK_ONBOARDING_TRACKS.find(track => track.id === trackId);
+    console.log(track ? "Found track" : "Track not found", MOCK_ONBOARDING_TRACKS);
     return track || null;
 }
+
+export async function getOnboardingTracks(companyId: string): Promise<OnboardingTrack[]> {
+    console.log(`Fetching all onboarding tracks for company ${companyId}`);
+    return MOCK_ONBOARDING_TRACKS.filter(track => track.companyId === companyId).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+}
+
 
 // LEGAL LIBRARY FUNCTIONS
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Clock, User, ExternalLink, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, User, ExternalLink, Loader2, CheckCircle, Award } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -14,16 +14,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ProgressTrackingService } from "@/services/progress-tracking";
-import { UserProgress } from "@/services/firebase";
-import { getCurrentUser } from "@/lib/firebaseAuth";
+import { getOnboardingTracks, OnboardingTrack } from '@/services/firebase';
+import { getCurrentUser } from '@/lib/firebaseAuth';
 
 interface MyPlansProps {
   companyId: string;
 }
 
 export function MyPlans({ companyId }: MyPlansProps) {
-  const [plans, setPlans] = useState<UserProgress[]>([]);
+  const [plans, setPlans] = useState<OnboardingTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -33,12 +32,13 @@ export function MyPlans({ companyId }: MyPlansProps) {
 
   useEffect(() => {
     loadUserPlans();
-  }, [userId]);
+  }, [userId, companyId]);
 
   const loadUserPlans = async () => {
     try {
       setIsLoading(true);
-      const userPlans = await ProgressTrackingService.getUserProgressList(userId);
+      // Fetch tracks directly, can be filtered by companyId in a real backend
+      const userPlans = await getOnboardingTracks(companyId);
       setPlans(userPlans);
     } catch (error) {
       console.error("Failed to load user plans:", error);
@@ -53,10 +53,16 @@ export function MyPlans({ companyId }: MyPlansProps) {
   };
 
   const handleViewPlan = async (trackId: string) => {
+    if (!trackId) {
+        toast({
+            variant: "destructive",
+            title: "Invalid Plan ID",
+            description: "This plan does not have a valid ID.",
+        });
+        return;
+    }
     setLoadingPlanId(trackId);
     try {
-      // Update lastViewed timestamp
-      await ProgressTrackingService.updateLastViewed(userId, trackId);
       router.push(`/track/${trackId}`);
     } catch (error) {
       console.error("Failed to view plan:", error);
@@ -69,23 +75,19 @@ export function MyPlans({ companyId }: MyPlansProps) {
     }
   };
 
-  const getStatusChip = (status: UserProgress['status']) => {
+  const getStatusChip = (status: OnboardingTrack['status']) => {
     const statusConfig = {
       draft: {
-        label: ProgressTrackingService.getStatusLabel(status),
+        label: "Draft",
         className: "bg-gray-100 text-gray-800 border-gray-200",
       },
-      confirmed: {
-        label: ProgressTrackingService.getStatusLabel(status),
+      published: {
+        label: "Published",
         className: "bg-green-100 text-green-800 border-green-200",
-      },
-      archived: {
-        label: ProgressTrackingService.getStatusLabel(status),
-        className: "bg-red-100 text-red-800 border-red-200",
       },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status || 'draft'];
     return (
       <Badge variant="outline" className={config.className}>
         {config.label}
@@ -95,13 +97,15 @@ export function MyPlans({ companyId }: MyPlansProps) {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    } catch {
+        return 'Invalid Date';
+    }
   };
 
   const formatDuration = (days: number) => {
@@ -142,7 +146,7 @@ export function MyPlans({ companyId }: MyPlansProps) {
         <CardHeader>
           <CardTitle>My Plans</CardTitle>
           <CardDescription>
-            Your training plans will appear here once you generate them.
+            Your generated training plans will appear here.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -150,19 +154,6 @@ export function MyPlans({ companyId }: MyPlansProps) {
             <p className="text-muted-foreground mb-4">
               No training plans found. Generate your first plan to get started!
             </p>
-            <Button 
-              onClick={() => {
-                // This would typically navigate to the Generate Plan tab
-                // For now, we'll just show a message
-                toast({
-                  title: "Navigate to Generate Plan",
-                  description: "In a full implementation, this would switch to the Generate Plan tab.",
-                });
-              }}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Generate Your First Plan
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -175,7 +166,7 @@ export function MyPlans({ companyId }: MyPlansProps) {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">My Plans</h2>
           <p className="text-muted-foreground">
-            View and manage your training plans ({plans.length} total)
+            View and manage your generated training plans ({plans.length} total)
           </p>
         </div>
       </div>
@@ -185,44 +176,38 @@ export function MyPlans({ companyId }: MyPlansProps) {
           <Card key={plan.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{plan.topic}</CardTitle>
+                <CardTitle className="text-lg">{plan.clarifiedTopic}</CardTitle>
                 {getStatusChip(plan.status)}
               </div>
               <CardDescription>
-                {plan.seniority} level • {plan.scope}
+                {plan.seniorityLevel} level • {plan.learningScope}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   <span>{formatDuration(plan.duration)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <span>Created {formatDate(plan.generatedAt)}</span>
+                  <span>Created {formatDate(plan.createdAt)}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  <span>Last viewed {formatDate(plan.lastViewed)}</span>
+                  <span>By: {plan.createdBy}</span>
                 </div>
-                {plan.confirmedAt && (
-                  <div className="flex items-center gap-2 text-green-600">
-                     <CheckCircle className="h-4 w-4" />
-                     <span>Confirmed {formatDate(plan.confirmedAt)}</span>
-                  </div>
-                )}
               </div>
               
               <div className="flex gap-2 mt-4">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleViewPlan(plan.trackId)}
-                  disabled={loadingPlanId === plan.trackId}
+                  onClick={() => handleViewPlan(plan.id!)}
+                  disabled={loadingPlanId === plan.id}
                   className="flex items-center gap-2"
                 >
-                  {loadingPlanId === plan.trackId ? (
+                  {loadingPlanId === plan.id ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Opening...
@@ -234,31 +219,6 @@ export function MyPlans({ companyId }: MyPlansProps) {
                     </>
                   )}
                 </Button>
-                
-                {plan.status === 'draft' && (
-                  <Button
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90"
-                    onClick={async () => {
-                      try {
-                        await ProgressTrackingService.confirmPlan(userId, plan.trackId);
-                        await loadUserPlans();
-                        toast({
-                          title: "Plan Confirmed",
-                          description: "Your training plan has been confirmed.",
-                        });
-                      } catch (error) {
-                        toast({
-                          variant: "destructive",
-                          title: "Failed to Confirm Plan",
-                          description: "Could not confirm the plan. Please try again.",
-                        });
-                      }
-                    }}
-                  >
-                    Confirm Plan
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>
