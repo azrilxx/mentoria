@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import {
   Form,
   FormControl,
@@ -79,6 +79,7 @@ export function OnboardingPlanner() {
   const [clarifiedTopic, setClarifiedTopic] = useState<string | null>(null);
   const [originalTopic, setOriginalTopic] = useState<string | null>(null);
   const [generatedPlanDetails, setGeneratedPlanDetails] = useState<GeneratedPlanDetails | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const { toast } = useToast();
 
@@ -88,6 +89,12 @@ export function OnboardingPlanner() {
       trainingFocus: "",
     },
   });
+
+  useEffect(() => {
+    if (generatedPlanDetails) {
+      previewRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [generatedPlanDetails]);
 
   const handleFocusBlur = async () => {
     const trainingFocus = form.getValues("trainingFocus");
@@ -169,7 +176,7 @@ export function OnboardingPlanner() {
     });
   };
 
-  const isLoading = isPending || isClarifying || isGenerating;
+  const isLoading = isPending || isGenerating;
   const isSubmitDisabled = isLoading || (isClarifying && suggestedTopics.length > 0);
 
   return (
@@ -291,7 +298,7 @@ export function OnboardingPlanner() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
+                    Generating plan...
                   </>
                 ) : (
                   "Generate Plan"
@@ -302,52 +309,55 @@ export function OnboardingPlanner() {
         </Form>
       </Card>
 
-      <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
-        <CardHeader>
-          <CardTitle>Temporary Track Preview</CardTitle>
-          {generatedPlanDetails ? (
-              <CardDescription>
-                <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
-              </CardDescription>
+      <div ref={previewRef} className="w-full">
+        <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
+          <CardHeader>
+            <CardTitle>Temporary Track Preview</CardTitle>
+            {generatedPlanDetails ? (
+                <CardDescription>
+                  <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
+                </CardDescription>
+              ) : (
+                <CardDescription>
+                  Review the generated plan. This is a temporary preview.
+                </CardDescription>
+              )}
+          </CardHeader>
+          <CardContent>
+            {isGenerating ? (
+              <div className="space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-8 w-4/5" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-8 w-3/4" />
+              </div>
+            ) : generatedPlanDetails ? (
+              <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
+                {generatedPlanDetails.plan.map((item, index) => (
+                  <AccordionItem value={`item-${index}`} key={index}>
+                    <AccordionTrigger className="text-lg font-bold">
+                      {item.day}: {item.title}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="list-disc space-y-2 pl-6">
+                        {item.modules.map((module, moduleIndex) => (
+                          <li key={moduleIndex}>{module}</li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             ) : (
-              <CardDescription>
-                Review the generated plan. This is a temporary preview.
-              </CardDescription>
+              <div className="text-center text-muted-foreground italic py-8">
+                No plan generated yet. Complete the fields and click Generate.
+              </div>
             )}
-        </CardHeader>
-        <CardContent>
-          {isGenerating ? (
-            <div className="space-y-4">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-8 w-4/5" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-8 w-3/4" />
-            </div>
-          ) : generatedPlanDetails ? (
-            <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
-              {generatedPlanDetails.plan.map((item, index) => (
-                <AccordionItem value={`item-${index}`} key={index}>
-                  <AccordionTrigger className="text-lg font-bold">
-                    {item.day}: {item.title}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ul className="list-disc space-y-2 pl-6">
-                      {item.modules.map((module, moduleIndex) => (
-                        <li key={moduleIndex}>{module}</li>
-                      ))}
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          ) : (
-            <div className="text-center text-muted-foreground italic py-8">
-              No plan generated yet. Complete the fields and click Generate.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
+
 
       <AlertDialog open={suggestedTopics.length > 0 && isClarifying}>
         <AlertDialogContent>
