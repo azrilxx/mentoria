@@ -32,7 +32,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { interpretTrainingFocus } from "@/ai/flows/interpret-training-focus";
-import { generateLessonPlan, DailyPlan, SopLink } from "@/ai/flows/generate-lesson-plan";
+import { generateLessonPlan, DailyPlan } from "@/ai/flows/generate-lesson-plan";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -135,56 +135,6 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
     setOriginalTopic(null);
   }
 
-  const parseLessonPlan = (planText: string): DailyPlan[] => {
-    if (!planText) return [];
-
-    const dailyPlans: DailyPlan[] = [];
-    const dayBlocks = planText.split(/Day \d+:/).filter(Boolean);
-    const dayTitles = planText.match(/Day \d+:.*(?:\r\n|\r|\n)/g) || [];
-
-    dayBlocks.forEach((block, index) => {
-        const titleMatch = dayTitles[index]?.trim().match(/Day (\d+): (.*)/i);
-        if (!titleMatch) return;
-
-        const dayNumber = titleMatch[1];
-        const dayTitle = titleMatch[2];
-        
-        const contentAndSops = block.split('Related SOPs:');
-        const contentBlock = contentAndSops[0];
-        const sopBlock = contentAndSops[1] || '';
-
-        const modules = contentBlock.split('\n')
-            .map(line => line.trim())
-            .filter(line => line.startsWith('- '))
-            .map(line => line.substring(2).trim());
-
-        const sops: SopLink[] = [];
-        const sopEntries = sopBlock.split('- SOP Document:').filter(s => s.trim());
-        
-        sopEntries.forEach(entry => {
-            const sopMatch = entry.match(/(.*?)\s\(link: (.*?)\)/);
-            if (sopMatch) {
-                const title = sopMatch[1].trim();
-                const url = sopMatch[2].trim();
-                const linkedLaws = (entry.match(/- Linked Law: (.*)/g) || [])
-                    .map(line => line.replace('- Linked Law: ', '').trim());
-                sops.push({ title, url, linkedLaws });
-            }
-        });
-
-        if (modules.length > 0) {
-            dailyPlans.push({
-                day: `Day ${dayNumber}`,
-                title: dayTitle,
-                modules: modules,
-                sops: sops
-            });
-        }
-    });
-
-    return dailyPlans;
-  };
-
   const onSubmit = (data: OnboardingFormValues) => {
     startTransition(async () => {
       setIsGenerating(true);
@@ -198,7 +148,6 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
           duration: parseInt(data.duration, 10),
           companyId,
           userId,
-          planParser: parseLessonPlan,
         });
         
         setGeneratedPlanDetails({

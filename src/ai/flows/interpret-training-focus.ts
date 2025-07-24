@@ -72,7 +72,11 @@ const interpretTrainingFocusFlow = ai.defineFlow(
       // Also suggest modules from the mapping
       mapping.recommendedModules.forEach(moduleTitle => {
         if (!suggestedTopics.some(st => st.title === moduleTitle)) {
-            suggestedTopics.push({ title: moduleTitle });
+            suggestedTopics.push({ 
+              title: moduleTitle, 
+              lawId: mapping.resolvedLawIds[0] || '',
+              domainTags: []
+            });
         }
       });
 

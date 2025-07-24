@@ -42,7 +42,6 @@ const GenerateLessonPlanInputSchema = z.object({
     .describe('The duration of the training track in days (2, 5, or 7).'),
   companyId: z.string().describe('The ID of the company requesting the plan.'),
   userId: z.string().describe('The ID of the user creating the plan.'),
-  planParser: z.function().args(z.string()).returns(z.array(DailyPlanSchema)),
 });
 export type GenerateLessonPlanInput = z.infer<
   typeof GenerateLessonPlanInputSchema
@@ -66,6 +65,57 @@ const PromptInputSchema = z.object({
   customModules: z.string().optional(),
   sops: z.string().optional(),
 });
+
+function parseLessonPlan(planText: string): DailyPlan[] {
+  if (!planText) return [];
+
+  const dailyPlans: DailyPlan[] = [];
+  const dayBlocks = planText.split(/Day \d+:/).filter(Boolean);
+  const dayTitles = planText.match(/Day \d+:.*(?:\r\n|\r|\n)/g) || [];
+
+  dayBlocks.forEach((block, index) => {
+      const titleMatch = dayTitles[index]?.trim().match(/Day (\d+): (.*)/i);
+      if (!titleMatch) return;
+
+      const dayNumber = titleMatch[1];
+      const dayTitle = titleMatch[2];
+      
+      const contentAndSops = block.split('Related SOPs:');
+      const contentBlock = contentAndSops[0];
+      const sopBlock = contentAndSops[1] || '';
+
+      const modules = contentBlock.split('\n')
+          .map(line => line.trim())
+          .filter(line => line.startsWith('- '))
+          .map(line => line.substring(2).trim());
+
+      const sops: SopLink[] = [];
+      const sopEntries = sopBlock.split('- SOP Document:').filter(s => s.trim());
+      
+      sopEntries.forEach(entry => {
+          const sopMatch = entry.match(/(.*?)\s\(link: (.*?)\)/);
+          if (sopMatch) {
+              const title = sopMatch[1].trim();
+              const url = sopMatch[2].trim();
+              const linkedLaws = (entry.match(/- Linked Law: (.*)/g) || [])
+                  .map(line => line.replace('- Linked Law: ', '').trim());
+              sops.push({ title, url, linkedLaws });
+          }
+      });
+
+      if (modules.length > 0) {
+          dailyPlans.push({
+              day: `Day ${dayNumber}`,
+              title: dayTitle,
+              modules: modules,
+              sops: sops
+          });
+      }
+  });
+
+  return dailyPlans;
+};
+
 
 export async function generateLessonPlan(
   input: GenerateLessonPlanInput
@@ -186,7 +236,7 @@ const generateLessonPlanFlow = ai.defineFlow(
       throw new Error('Failed to generate lesson plan content.');
     }
     
-    const parsedPlan = input.planParser(output.lessonPlan);
+    const parsedPlan = parseLessonPlan(output.lessonPlan);
     
     const trackId = await saveOnboardingTrack({
       trainingFocus: input.trainingFocus,

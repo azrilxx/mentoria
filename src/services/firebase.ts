@@ -5,6 +5,8 @@
 
 import {z} from 'zod';
 import { DailyPlanSchema } from '@/lib/schemas';
+import { LegalDocument, LegalDocumentSchema } from './legal-ingestion';
+import { CompanyMetadataEnhanced } from './company-metadata';
 
 // MOCK DATA and SCHEMAS
 
@@ -76,7 +78,18 @@ export const CompanyMetadataSchema = z.object({
 });
 export type CompanyMetadata = z.infer<typeof CompanyMetadataSchema>;
 
-// `onboardingTracks` collection
+// Enhanced `onboardingTracks` collection with legal and company references
+export const LegalReferenceSchema = z.object({
+  lawTitle: z.string(),
+  sourceUrl: z.string(),
+  relevanceScore: z.number(),
+});
+
+export const CompanyPolicyReferenceSchema = z.object({
+  policyType: z.string(),
+  policyText: z.string(),
+});
+
 export const OnboardingTrackSchema = z.object({
   id: z.string().optional(),
   companyId: z.string(),
@@ -98,8 +111,19 @@ export const OnboardingTrackSchema = z.object({
           accent: z.string(),
       }).optional(),
   }),
+  // Enhanced fields for legal and company integration
+  legalReferences: z.array(LegalReferenceSchema).optional(),
+  companyPolicies: z.array(CompanyPolicyReferenceSchema).optional(),
+  sourceMetadata: z.object({
+    lawRefs: z.array(z.string()).optional(),
+    companyRefs: z.array(z.string()).optional(),
+    unresolvedTopics: z.array(z.string()).optional(),
+  }).optional(),
 });
+
 export type OnboardingTrack = z.infer<typeof OnboardingTrackSchema>;
+export type LegalReference = z.infer<typeof LegalReferenceSchema>;
+export type CompanyPolicyReference = z.infer<typeof CompanyPolicyReferenceSchema>;
 
 
 // MOCK DATABASE
@@ -184,6 +208,9 @@ const MOCK_COMPANY_METADATA: CompanyMetadata[] = [
 
 
 let MOCK_ONBOARDING_TRACKS: OnboardingTrack[] = [];
+
+// `legalLibrary` collection (from legal ingestion engine)
+let MOCK_LEGAL_LIBRARY: LegalDocument[] = [];
 
 
 // SIMULATED FIRESTORE FUNCTIONS
@@ -281,4 +308,61 @@ export async function saveOnboardingTrack(trackData: Omit<OnboardingTrack, 'id' 
     MOCK_ONBOARDING_TRACKS.push(newTrack);
     console.log(`Saved track with ID: ${newTrack.id}, Current Tracks:`, MOCK_ONBOARDING_TRACKS);
     return newTrack.id!;
+}
+
+// LEGAL LIBRARY FUNCTIONS
+
+export async function searchLegalLibrary(query: string): Promise<LegalDocument[]> {
+    console.log(`Searching legal library for: ${query}`);
+    const searchTerms = query.toLowerCase().split(' ');
+    
+    return MOCK_LEGAL_LIBRARY.filter(doc => {
+        const searchableText = (
+            doc.lawTitle + ' ' + 
+            doc.category + ' ' + 
+            doc.keywords.join(' ') + ' ' +
+            doc.synonyms.join(' ')
+        ).toLowerCase();
+        
+        return searchTerms.some(term => searchableText.includes(term));
+    });
+}
+
+export async function getLegalDocumentsByCategory(category: string): Promise<LegalDocument[]> {
+    console.log(`Fetching legal documents for category: ${category}`);
+    return MOCK_LEGAL_LIBRARY.filter(doc => 
+        doc.category.toLowerCase() === category.toLowerCase()
+    );
+}
+
+export async function getHRRelevantLegalDocs(): Promise<LegalDocument[]> {
+    console.log('Fetching HR-relevant legal documents');
+    return MOCK_LEGAL_LIBRARY.filter(doc => doc.onboardingRelevance);
+}
+
+export async function saveLegalDocumentToFirebase(docData: Omit<LegalDocument, 'id' | 'createdAt' | 'lastUpdated'>): Promise<string> {
+    console.log(`Saving legal document: ${docData.lawTitle}`);
+    const newDoc: LegalDocument = {
+        ...docData,
+        id: `legal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+    };
+    MOCK_LEGAL_LIBRARY.push(newDoc);
+    console.log(`Saved legal document with ID: ${newDoc.id}`);
+    return newDoc.id!;
+}
+
+export async function getAllLegalDocuments(): Promise<LegalDocument[]> {
+    return [...MOCK_LEGAL_LIBRARY];
+}
+
+export async function clearLegalLibraryFirebase(): Promise<void> {
+    MOCK_LEGAL_LIBRARY = [];
+    console.log('Legal library cleared in Firebase');
+}
+
+export async function updateLegalLibraryBatch(documents: LegalDocument[]): Promise<void> {
+    MOCK_LEGAL_LIBRARY = [...documents];
+    console.log(`Updated legal library with ${documents.length} documents`);
 }
