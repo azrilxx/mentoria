@@ -9,6 +9,8 @@
     "legal-ingestion": "tsx src/scripts/run-legal-ingestion.ts",
     "test-enhanced-plans": "tsx src/scripts/test-enhanced-lesson-plan.ts",
     "demo-enhanced-plans": "tsx src/scripts/demo-enhanced-lesson-plan.ts",
+    "test-quiz-generation": "tsx src/scripts/test-quiz-generation.ts",
+    "setup-test-user": "tsx src/scripts/setup-test-user.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

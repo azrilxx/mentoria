@@ -21,8 +21,9 @@ import {
   getCompanyMetadata,
   contextualizeWithCompanyPolicy 
 } from '@/services/company-metadata';
-import { DailyPlanSchema } from '@/lib/schemas';
-import type { DailyPlan } from '@/lib/schemas';
+import { DailyPlanSchema, TrainingModuleSchema, QuizModuleSchema } from '@/lib/schemas';
+import type { DailyPlan, TrainingModule, QuizModule } from '@/lib/schemas';
+import { generateQuizForModule, enhanceModuleWithQuiz, validateQuiz } from '@/services/quiz-generator';
 
 // Enhanced input schema with legal and company integration
 const EnhancedGenerateLessonPlanInputSchema = z.object({
@@ -276,6 +277,97 @@ Use markdown with clear day-by-day structure, bullet points for modules, and quo
 });
 
 /**
+ * Enhances lesson plan content with interactive quizzes
+ */
+async function enhanceLessonPlanWithQuizzes(
+  lessonPlan: string,
+  legalContent: any[],
+  companyContext: any,
+  companyName: string
+): Promise<{ enhancedPlan: string; quizModules: QuizModule[] }> {
+  console.log('📝 Enhancing lesson plan with interactive quizzes...');
+  
+  const lines = lessonPlan.split('\n');
+  const enhancedLines: string[] = [];
+  const quizModules: QuizModule[] = [];
+  let currentModule: { title: string; summary: string; reference?: string } | null = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    enhancedLines.push(lines[i]);
+    
+    // Detect module lines (bullet points)
+    if (line.startsWith('- ')) {
+      const moduleTitle = line.substring(2).trim();
+      
+      // Look for the next few lines to build module summary
+      let moduleSummary = '';
+      let j = i + 1;
+      while (j < lines.length && j < i + 3) {
+        const nextLine = lines[j].trim();
+        if (nextLine && !nextLine.startsWith('- ') && !nextLine.startsWith('#') && !nextLine.startsWith('>')) {
+          moduleSummary += nextLine + ' ';
+        }
+        j++;
+      }
+      
+      if (moduleSummary.length < 20) {
+        moduleSummary = `Training module covering ${moduleTitle.toLowerCase()} concepts and practical applications.`;
+      }
+      
+      // Determine reference source
+      let reference = 'general_training';
+      if (legalContent.length > 0) {
+        reference = legalContent[0].sourceUrl;
+      }
+      if (companyContext && (moduleTitle.toLowerCase().includes('policy') || moduleTitle.toLowerCase().includes(companyName.toLowerCase()))) {
+        reference = `companyMetadata/${companyContext.companyId || 'company'}`;
+      }
+      
+      currentModule = {
+        title: moduleTitle,
+        summary: moduleSummary.trim(),
+        reference
+      };
+      
+      // Generate quiz for this module
+      const quiz = generateQuizForModule(
+        currentModule,
+        legalContent,
+        companyContext
+      );
+      
+      if (quiz) {
+        const validation = validateQuiz(quiz);
+        if (validation.isValid) {
+          quizModules.push(quiz);
+          
+          // Add quiz to the lesson plan
+          enhancedLines.push('');
+          enhancedLines.push('  **📝 Quick Knowledge Check:**');
+          enhancedLines.push(`  *${quiz.question}*`);
+          enhancedLines.push('  ```');
+          quiz.options.forEach((option, idx) => {
+            const marker = option === quiz.correctAnswer ? '✅' : '  ';
+            enhancedLines.push(`  ${String.fromCharCode(65 + idx)}. ${option} ${marker}`);
+          });
+          enhancedLines.push('  ```');
+          enhancedLines.push(`  💡 **Explanation:** ${quiz.explanation}`);
+          enhancedLines.push('');
+        } else {
+          console.warn(`⚠️ Quiz validation failed for "${moduleTitle}":`, validation.issues);
+        }
+      }
+    }
+  }
+  
+  return {
+    enhancedPlan: enhancedLines.join('\n'),
+    quizModules
+  };
+}
+
+/**
  * Main enhanced lesson plan generation flow
  */
 export const generateEnhancedLessonPlan = ai.defineFlow({
@@ -343,8 +435,18 @@ export const generateEnhancedLessonPlan = ai.defineFlow({
       throw new Error('Failed to generate enhanced lesson plan content');
     }
     
-    // Step 5: Parse the plan
-    const parsedPlan = input.planParser(output.lessonPlan);
+    // Step 4.5: Enhance lesson plan with interactive quizzes
+    const { enhancedPlan, quizModules } = await enhanceLessonPlanWithQuizzes(
+      output.lessonPlan,
+      references,
+      input.companyId ? await getCompanyMetadata(input.companyId) : null,
+      companyName
+    );
+    
+    console.log(`📝 Generated ${quizModules.length} interactive quizzes for training modules`);
+    
+    // Step 5: Parse the enhanced plan
+    const parsedPlan = input.planParser(enhancedPlan);
     
     // Step 6: Save enhanced onboarding track
     const trackId = await saveOnboardingTrack({
@@ -365,7 +467,7 @@ export const generateEnhancedLessonPlan = ai.defineFlow({
     console.log('✅ Enhanced lesson plan generated successfully');
     
     return {
-      lessonPlan: output.lessonPlan,
+      lessonPlan: enhancedPlan,
       trackId,
       parsedPlan,
       legalReferences: references,

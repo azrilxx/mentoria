@@ -1,42 +1,52 @@
-import { OnboardingPlanner } from "@/components/onboarding-planner";
-import { Icons } from "@/components/icons";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { FilePlus } from "lucide-react";
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser, onAuthStateChange } from '@/lib/firebaseAuth';
+import { Loader2 } from 'lucide-react';
+import { Icons } from '@/components/icons';
 
 export default function Home() {
-  const companyName = "Desaria Group";
-  const sector = "Real Estate";
-  const companyId = "desaria-group-123"; // Placeholder
+  const router = useRouter();
 
+  useEffect(() => {
+    // Check if user is authenticated and redirect to dashboard
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      router.push('/dashboard');
+      return;
+    }
+
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        router.push('/login');
+      }
+    });
+
+    // If no current user, redirect to login
+    if (!currentUser) {
+      router.push('/login');
+    }
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Show loading while determining auth state
   return (
-    <main className="flex min-h-screen w-full flex-col items-center bg-background">
-      <div className="w-full max-w-4xl p-4 sm:p-6 lg:p-8">
-        <header className="mb-8">
-          <div className="flex justify-between items-center">
-             <div className="text-left">
-                <div className="inline-flex items-center gap-3">
-                   <Icons.logo className="h-10 w-10 text-primary" />
-                  <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                    Welcome, HR team at {companyName}
-                  </h1>
-                </div>
-                <p className="mt-2 text-lg text-muted-foreground italic">
-                  Custom onboarding builder for {sector} compliance.
-                </p>
-             </div>
-             <div>
-                <Button asChild>
-                  <Link href="/admin/sop">
-                    <FilePlus className="mr-2 h-4 w-4" />
-                    Manage SOPs
-                  </Link>
-                </Button>
-             </div>
-          </div>
-        </header>
-        <OnboardingPlanner companyId={companyId} />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+      <div className="text-center">
+        <Icons.logo className="h-16 w-16 text-primary mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Mentoria Onboard
+        </h1>
+        <div className="flex items-center gap-2 text-muted-foreground justify-center">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

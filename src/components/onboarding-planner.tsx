@@ -379,7 +379,9 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                         <AccordionContent>
                           <ul className="list-disc space-y-2 pl-6">
                             {item.modules.map((module, moduleIndex) => (
-                              <li key={moduleIndex}>{module}</li>
+                              <li key={moduleIndex}>
+                                {typeof module === 'string' ? module : module.title}
+                              </li>
                             ))}
                           </ul>
                           {item.sops && item.sops.length > 0 && (
