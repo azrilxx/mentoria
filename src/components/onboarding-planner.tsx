@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, ExternalLink, Send } from "lucide-react";
+import { Loader2, ExternalLink, Send, CheckCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useState, useTransition, useRef, useEffect } from "react";
@@ -54,6 +54,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   trainingFocus: z.string().min(2, {
@@ -82,6 +83,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
   const [isAcknowledged, setIsAcknowledged] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const userId = "hr_admin_user"; // Placeholder
 
@@ -189,6 +191,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
       setGeneratedPlanDetails(null);
       setIsAcknowledged(false);
       setFeedback("");
+      setFeedbackSubmitted(false);
       try {
         const result = await generateLessonPlan({
           ...data,
@@ -222,23 +225,32 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
       setIsSubmittingFeedback(true);
       try {
           // In a real app, you would call a service function like:
-          // await saveEngagementFeedback({
+          // await saveEngagementLog({
           //     trackId: generatedPlanDetails.trackId,
           //     userId: userId,
-          //     acknowledged: isAcknowledged,
+          //     acknowledgedAt: new Date().toISOString(),
           //     feedback: feedback,
+          //     trackTitle: generatedPlanDetails.trainingFocus,
+          //     seniority: generatedPlanDetails.seniorityLevel,
+          //     scope: generatedPlanDetails.learningScope,
+          //     duration: parseInt(generatedPlanDetails.duration, 10)
           // });
-          console.log("Submitting feedback:", {
-              trackId: generatedPlanDetails.trackId,
+          console.log("Submitting engagement log for trackId:", generatedPlanDetails.trackId);
+          console.log({
               userId: userId,
-              acknowledged: isAcknowledged,
+              acknowledgedAt: new Date().toISOString(),
               feedback: feedback,
+              trackTitle: generatedPlanDetails.trainingFocus,
+              seniority: generatedPlanDetails.seniorityLevel,
+              scope: generatedPlanDetails.learningScope,
+              duration: parseInt(generatedPlanDetails.duration, 10)
           });
           
           toast({
               title: "Feedback Submitted",
-              description: "Thank you for your input!",
+              description: "Thank you for your input! HR will be notified.",
           });
+          setFeedbackSubmitted(true);
 
       } catch (error) {
           console.error("Failed to submit feedback", error);
@@ -386,7 +398,21 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
       </Card>
 
       <div ref={previewRef} className="w-full">
-        {generatedPlanDetails && (
+        {isLoading ? (
+             <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
+                 <CardHeader>
+                    <Skeleton className="h-8 w-3/5" />
+                    <Skeleton className="h-4 w-4/5" />
+                 </CardHeader>
+                 <CardContent>
+                    <div className="space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                 </CardContent>
+            </Card>
+        ) : generatedPlanDetails ? (
           <>
             <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
               <CardHeader>
@@ -396,16 +422,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
-                    <div className="space-y-4">
-                        <Skeleton className="h-10 w-full" />
-                        <div className="space-y-2 pl-4">
-                            <Skeleton className="h-4 w-4/5" />
-                            <Skeleton className="h-4 w-3/5" />
-                        </div>
-                         <Skeleton className="h-10 w-full" />
-                    </div>
-                ) : generatedPlanDetails.plan.length > 0 ? (
+                {generatedPlanDetails.plan.length > 0 ? (
                   <Accordion type="single" collapsible defaultValue="item-0" className="w-full">
                     {generatedPlanDetails.plan.map((item, index) => (
                       <AccordionItem value={`item-${index}`} key={item.day}>
@@ -461,48 +478,58 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                 <CardHeader>
                     <CardTitle>Plan Acknowledgment & Feedback</CardTitle>
                     <CardDescription>
-                        Review the plan and provide your feedback.
+                       This is a temporary preview. Review the plan and provide feedback below.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="items-top flex space-x-2">
-                        <Checkbox id="terms1" checked={isAcknowledged} onCheckedChange={(checked) => setIsAcknowledged(checked as boolean)} />
-                        <div className="grid gap-1.5 leading-none">
-                            <label
-                                htmlFor="terms1"
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                                I have reviewed and acknowledge this onboarding plan.
-                            </label>
+                {feedbackSubmitted ? (
+                    <CardContent>
+                        <div className="flex items-center gap-3 rounded-md bg-green-50 p-4 text-green-800 border border-green-200">
+                           <CheckCircle className="h-6 w-6" />
+                           <p className="font-medium">Thanks for confirming! HR will now review your feedback.</p>
                         </div>
-                    </div>
-                    <div className="grid w-full gap-1.5">
-                        <Label htmlFor="feedback">Optional Feedback</Label>
-                        <Textarea 
-                            placeholder="Is there anything unclear or that should be improved?" 
-                            id="feedback" 
-                            value={feedback}
-                            onChange={(e) => setFeedback(e.target.value)}
-                            maxLength={500}
-                        />
-                         <p className="text-sm text-muted-foreground">
-                            Your feedback is valuable for refining future training.
-                        </p>
-                    </div>
-                </CardContent>
-                <CardFooter>
-                    <Button onClick={handleFeedbackSubmit} disabled={!isAcknowledged || isSubmittingFeedback}>
-                         {isSubmittingFeedback ? (
-                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-                         ) : (
-                            <><Send className="mr-2 h-4 w-4" /> Submit Acknowledgment</>
-                         )}
-                    </Button>
-                </CardFooter>
+                    </CardContent>
+                ) : (
+                    <>
+                        <CardContent className="space-y-4">
+                            <div className="items-top flex space-x-2">
+                                <Checkbox id="terms1" checked={isAcknowledged} onCheckedChange={(checked) => setIsAcknowledged(checked as boolean)} />
+                                <div className="grid gap-1.5 leading-none">
+                                    <label
+                                        htmlFor="terms1"
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                        I have reviewed and acknowledge this onboarding plan.
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="grid w-full gap-1.5">
+                                <Label htmlFor="feedback">Optional Feedback</Label>
+                                <Textarea 
+                                    placeholder="Is there anything unclear or that should be improved?" 
+                                    id="feedback" 
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    maxLength={500}
+                                />
+                                 <p className="text-sm text-muted-foreground">
+                                    Your feedback is valuable for refining future training.
+                                </p>
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <Button onClick={handleFeedbackSubmit} disabled={!isAcknowledged || isSubmittingFeedback}>
+                                 {isSubmittingFeedback ? (
+                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+                                 ) : (
+                                    <><Send className="mr-2 h-4 w-4" /> Submit Acknowledgment</>
+                                 )}
+                            </Button>
+                        </CardFooter>
+                    </>
+                )}
             </Card>
           </>
-        )}
-        {!generatedPlanDetails && !isLoading &&(
+        ) : (
             <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
                  <CardHeader>
                     <CardTitle>Temporary Track Preview</CardTitle>
