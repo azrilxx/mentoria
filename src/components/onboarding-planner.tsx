@@ -73,6 +73,7 @@ export function OnboardingPlanner() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
   const [clarifiedTopic, setClarifiedTopic] = useState<string | null>(null);
+  const [originalTopic, setOriginalTopic] = useState<string | null>(null);
   const [generatedPlan, setGeneratedPlan] = useState<DailyPlan[] | null>(null);
 
   const { toast } = useToast();
@@ -86,8 +87,9 @@ export function OnboardingPlanner() {
 
   const handleFocusBlur = async () => {
     const trainingFocus = form.getValues("trainingFocus");
-    if (trainingFocus && trainingFocus !== clarifiedTopic) {
+    if (trainingFocus && trainingFocus.split(' ').length <= 2 && trainingFocus !== clarifiedTopic) {
       setIsClarifying(true);
+      setOriginalTopic(trainingFocus);
       try {
         const result = await interpretTrainingFocus({ trainingFocus });
         setSuggestedTopics(result.suggestedTopics);
@@ -107,6 +109,7 @@ export function OnboardingPlanner() {
     setClarifiedTopic(topic);
     setSuggestedTopics([]);
     setIsClarifying(false);
+    setOriginalTopic(null);
   };
 
   const parseLessonPlan = (plan: string): DailyPlan[] => {
@@ -160,6 +163,7 @@ export function OnboardingPlanner() {
   };
 
   const isLoading = isPending || isClarifying || isGenerating;
+  const isSubmitDisabled = isLoading || (isClarifying && suggestedTopics.length > 0);
 
   return (
     <>
@@ -276,7 +280,7 @@ export function OnboardingPlanner() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isSubmitDisabled}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -330,12 +334,12 @@ export function OnboardingPlanner() {
         </Card>
       )}
 
-      <AlertDialog open={suggestedTopics.length > 0}>
+      <AlertDialog open={suggestedTopics.length > 0 && isClarifying}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Clarify Training Focus</AlertDialogTitle>
             <AlertDialogDescription>
-              Your input is a bit broad. Please select a more specific topic to continue.
+              You entered '{originalTopic}'. Did you mean:
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col space-y-2">
