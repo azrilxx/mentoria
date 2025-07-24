@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2, FileText, UploadCloud } from "lucide-react";
+import { Loader2, Trash2, FileText, UploadCloud, Link as LinkIcon } from "lucide-react";
 import { getSopsByCompany, saveSop, deleteSop, Sop } from "@/services/firebase";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +61,6 @@ export function SopManager({ companyId, userId }: { companyId: string, userId: s
 
                 const tagsArray = data.tags.split(',').map(tag => tag.trim().toLowerCase());
 
-                // This simulates the upload and saving process
                 await saveSop({
                     companyId,
                     uploadedBy: userId,
@@ -69,15 +68,16 @@ export function SopManager({ companyId, userId }: { companyId: string, userId: s
                     tags: tagsArray,
                     fileName: file.name,
                     fileUrl: `/sops/${companyId}/${file.name}`, // Simulated URL
+                    linkedLaws: [], // This will be populated by the backend simulation
                 });
 
                 toast({
                     title: "SOP Uploaded",
-                    description: `${file.name} has been saved.`,
+                    description: `${file.name} has been saved and is being analyzed for legal links.`,
                 });
                 form.reset({ department: '', tags: '', file: undefined });
-                // Refresh the list
-                fetchSops();
+                // Refresh the list after a short delay to allow "backend" processing
+                setTimeout(() => fetchSops(), 1000);
             } catch (error) {
                 console.error(error);
                 toast({
@@ -186,8 +186,8 @@ export function SopManager({ companyId, userId }: { companyId: string, userId: s
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Filename</TableHead>
-                                    <TableHead>Tags</TableHead>
                                     <TableHead>Department</TableHead>
+                                    <TableHead>Tags & Links</TableHead>
                                     <TableHead>Uploaded</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -206,12 +206,18 @@ export function SopManager({ companyId, userId }: { companyId: string, userId: s
                                                <FileText className="h-4 w-4 text-muted-foreground" />
                                                {sop.fileName}
                                             </TableCell>
+                                            <TableCell>{sop.department}</TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {sop.tags.map(tag => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                                                    {(sop.linkedLaws?.length || 0) > 0 && (
+                                                        <Badge variant="outline" className="border-green-300 bg-green-50 text-green-800">
+                                                            <LinkIcon className="mr-1 h-3 w-3" />
+                                                            {sop.linkedLaws!.length} Law Link(s)
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{sop.department}</TableCell>
                                             <TableCell>{format(new Date(sop.createdAt), 'dd MMM yyyy')}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="ghost" size="icon" onClick={() => handleDelete(sop.id!, sop.fileName)} disabled={isPending}>

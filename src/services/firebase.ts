@@ -50,7 +50,7 @@ export const CustomModuleSchema = z.object({
 });
 export type CustomModule = z.infer<typeof CustomModuleSchema>;
 
-// `sops` collection
+// `sops` collection / `company_sops`
 export const SopSchema = z.object({
     id: z.string().optional(),
     companyId: z.string(),
@@ -60,9 +60,20 @@ export const SopSchema = z.object({
     fileUrl: z.string(),
     fileName: z.string(),
     createdAt: z.string(),
+    linkedLaws: z.array(z.string()).optional(), // Matched law IDs
 });
 export type Sop = z.infer<typeof SopSchema>;
 
+// `company_metadata` collection
+export const CompanyMetadataSchema = z.object({
+  companyId: z.string(),
+  industry: z.string(),
+  size: z.enum(['<50', '50–100', '100–500', '500+']),
+  regulatoryBodies: z.array(z.string()),
+  location: z.string(),
+  focusAreas: z.array(z.string()),
+});
+export type CompanyMetadata = z.infer<typeof CompanyMetadataSchema>;
 
 // `onboardingTracks` collection
 export const OnboardingTrackSchema = z.object({
@@ -143,10 +154,22 @@ let MOCK_SOPS: Sop[] = [
         companyId: 'desaria-group-123',
         uploadedBy: 'hr_admin_user',
         department: 'Finance',
-        tags: ['audit', 'compliance'],
+        tags: ['audit', 'compliance', 'pdpa'],
         fileUrl: '/sops/desaria-group-123/Internal_Audit_Checklist.pdf',
         fileName: 'Internal_Audit_Checklist.pdf',
         createdAt: new Date().toISOString(),
+        linkedLaws: ['law_pdpa2010'],
+    }
+];
+
+const MOCK_COMPANY_METADATA: CompanyMetadata[] = [
+    {
+        companyId: 'desaria-group-123',
+        industry: 'Real Estate & Construction',
+        size: '500+',
+        regulatoryBodies: ['CIDB', 'BEM'],
+        location: 'Kuala Lumpur',
+        focusAreas: ['compliance', 'governance', 'customer service'],
     }
 ];
 
@@ -170,6 +193,12 @@ export async function getLawsByTags(tags: string[]): Promise<Law[]> {
     );
 }
 
+export async function getLawsByIds(ids: string[]): Promise<Law[]> {
+    console.log(`Fetching laws with IDs: ${ids.join(', ')}`);
+    if (ids.length === 0) return [];
+    return MOCK_LAWS.filter(law => ids.includes(law.id));
+}
+
 export async function getCustomModulesByTags(companyId: string, tags: string[]): Promise<CustomModule[]> {
      console.log(`Fetching custom modules for company ${companyId} with tags: ${tags.join(', ')}`);
     return MOCK_CUSTOM_MODULES.filter(module => 
@@ -191,12 +220,29 @@ export async function getSopsByCompany(companyId: string): Promise<Sop[]> {
     return MOCK_SOPS.filter(sop => sop.companyId === companyId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+/**
+ * Simulates saving an SOP and then "analyzing" it to link to relevant laws.
+ */
 export async function saveSop(sopData: Omit<Sop, 'id' | 'createdAt'>): Promise<string> {
     console.log(`Saving new SOP: ${sopData.fileName}`);
+    
+    // Simulate NLP/keyword matching to link laws
+    const linkedLaws: string[] = [];
+    for (const law of MOCK_LAWS) {
+        // If any of the SOP's tags are present in the law's domainTags, link them.
+        if (sopData.tags.some(tag => law.domainTags.includes(tag))) {
+            if (!linkedLaws.includes(law.id)) {
+                linkedLaws.push(law.id);
+            }
+        }
+    }
+    console.log(`Automatically linked SOP to ${linkedLaws.length} laws.`);
+
     const newSop: Sop = {
         ...sopData,
         id: `sop_${Date.now()}`,
         createdAt: new Date().toISOString(),
+        linkedLaws: linkedLaws,
     };
     MOCK_SOPS.push(newSop);
     console.log(`Saved SOP with ID: ${newSop.id}`);

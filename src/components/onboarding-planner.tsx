@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
   trainingFocus: z.string().min(2, {
@@ -63,11 +64,16 @@ const formSchema = z.object({
 
 type OnboardingFormValues = z.infer<typeof formSchema>;
 
+interface SopLink {
+  title: string;
+  url: string;
+  linkedLaws: string[];
+}
 interface DailyPlan {
   day: string;
   title: string;
   modules: string[];
-  sops: { title: string, url: string }[];
+  sops: SopLink[];
 }
 
 interface GeneratedPlanDetails extends OnboardingFormValues {
@@ -145,20 +151,29 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
 
         const dayNumber = titleMatch[1];
         const dayTitle = titleMatch[2];
+        
+        const contentAndSops = block.split('Related SOPs:');
+        const contentBlock = contentAndSops[0];
+        const sopBlock = contentAndSops[1] || '';
 
-        const modules = block.split('\n')
+        const modules = contentBlock.split('\n')
             .map(line => line.trim())
             .filter(line => line.startsWith('- '))
             .map(line => line.substring(2).trim());
 
-        const sopBlock = block.split('Related SOPs:')[1] || '';
-        const sops = (sopBlock.match(/- SOP Document: (.*?)\s\(link: (.*?)\)/g) || [])
-          .map(line => {
-              const match = line.match(/- SOP Document: (.*?)\s\(link: (.*?)\)/);
-              return match ? { title: match[1], url: match[2] } : null;
-          })
-          .filter((sop): sop is { title: string, url: string } => sop !== null);
-
+        const sops: SopLink[] = [];
+        const sopEntries = sopBlock.split('- SOP Document:').filter(s => s.trim());
+        
+        sopEntries.forEach(entry => {
+            const sopMatch = entry.match(/(.*?)\s\(link: (.*?)\)/);
+            if (sopMatch) {
+                const title = sopMatch[1].trim();
+                const url = sopMatch[2].trim();
+                const linkedLaws = (entry.match(/- Linked Law: (.*)/g) || [])
+                    .map(line => line.replace('- Linked Law: ', '').trim());
+                sops.push({ title, url, linkedLaws });
+            }
+        });
 
         if (modules.length > 0) {
             dailyPlans.push({
@@ -184,7 +199,6 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
           companyId,
         });
         
-        console.log("🧪 lessonPlan result:", result.lessonPlan);
         const parsedPlan = parseLessonPlan(result.lessonPlan);
         
         setGeneratedPlanDetails({
@@ -343,7 +357,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
             <CardTitle>Temporary Track Preview</CardTitle>
             {generatedPlanDetails ? (
                 <CardDescription>
-                  <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
+                  <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetais.learningScope})
                 </CardDescription>
             ) : (
                 <CardDescription>
@@ -375,22 +389,29 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                       {item.sops && item.sops.length > 0 && (
                         <>
                            <Separator className="my-4" />
-                           <div className="space-y-2">
+                           <div className="space-y-3">
                                 <h4 className="font-semibold">Related SOPs</h4>
-                                <ul className="list-none space-y-1 pl-1">
-                                    {item.sops.map((sop, sopIndex) => (
-                                       <li key={sopIndex} className="text-sm">
-                                            <a
-                                                href={sop.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center text-primary hover:underline"
-                                            >
-                                               {sop.title} <ExternalLink className="ml-2 h-4 w-4" />
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
+                                {item.sops.map((sop, sopIndex) => (
+                                   <div key={sopIndex} className="text-sm p-3 bg-muted/50 rounded-md">
+                                        <a
+                                            href={sop.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center text-primary font-semibold hover:underline"
+                                        >
+                                           {sop.title} <ExternalLink className="ml-2 h-4 w-4" />
+                                        </a>
+                                        {sop.linkedLaws.length > 0 && (
+                                            <div className="mt-2 space-y-1">
+                                                {sop.linkedLaws.map((law, lawIndex) => (
+                                                    <Badge key={lawIndex} variant="outline" className="font-normal">
+                                                        Linked Law: {law}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                            </div>
                         </>
                       )}
