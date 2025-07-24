@@ -4,6 +4,7 @@
 // DO NOT MODIFY THIS FILE to add Admin SDK initialization.
 
 import {z} from 'zod';
+import { DailyPlanSchema } from '@/lib/schemas';
 
 // MOCK DATA and SCHEMAS
 
@@ -78,17 +79,25 @@ export type CompanyMetadata = z.infer<typeof CompanyMetadataSchema>;
 // `onboardingTracks` collection
 export const OnboardingTrackSchema = z.object({
   id: z.string().optional(),
+  companyId: z.string(),
+  createdBy: z.string(),
   trainingFocus: z.string(),
-  duration: z.number(),
+  clarifiedTopic: z.string(),
   seniorityLevel: z.string(),
   learningScope: z.string(),
-  companyId: z.string(),
-  resolvedLaws: z.array(z.string()),
-  includedCustomModules: z.array(z.string()),
-  includedSops: z.array(z.string()).optional(),
-  generatedModules: z.array(z.any()), // Can be more specific later
-  generatedPlanText: z.string(),
-  createdAt: z.string(),
+  duration: z.number(),
+  plan: z.array(DailyPlanSchema),
+  status: z.enum(["draft", "published"]),
+  publishedAt: z.string().optional(),
+  createdAt: z.string().optional(),
+  branding: z.object({
+      companyName: z.string(),
+      logoUrl: z.string().optional(),
+      colorScheme: z.object({
+          primary: z.string(),
+          accent: z.string(),
+      }).optional(),
+  }),
 });
 export type OnboardingTrack = z.infer<typeof OnboardingTrackSchema>;
 
@@ -174,7 +183,7 @@ const MOCK_COMPANY_METADATA: CompanyMetadata[] = [
 ];
 
 
-const MOCK_ONBOARDING_TRACKS: OnboardingTrack[] = [];
+let MOCK_ONBOARDING_TRACKS: OnboardingTrack[] = [];
 
 
 // SIMULATED FIRESTORE FUNCTIONS
@@ -270,6 +279,6 @@ export async function saveOnboardingTrack(trackData: Omit<OnboardingTrack, 'id' 
         createdAt: new Date().toISOString(),
     };
     MOCK_ONBOARDING_TRACKS.push(newTrack);
-    console.log(`Saved track with ID: ${newTrack.id}`);
+    console.log(`Saved track with ID: ${newTrack.id}, Current Tracks:`, MOCK_ONBOARDING_TRACKS);
     return newTrack.id!;
 }

@@ -32,7 +32,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { interpretTrainingFocus } from "@/ai/flows/interpret-training-focus";
-import { generateLessonPlan } from "@/ai/flows/generate-lesson-plan";
+import { generateLessonPlan, DailyPlan, SopLink } from "@/ai/flows/generate-lesson-plan";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -64,18 +64,6 @@ const formSchema = z.object({
 
 type OnboardingFormValues = z.infer<typeof formSchema>;
 
-interface SopLink {
-  title: string;
-  url: string;
-  linkedLaws: string[];
-}
-interface DailyPlan {
-  day: string;
-  title: string;
-  modules: string[];
-  sops: SopLink[];
-}
-
 interface GeneratedPlanDetails extends OnboardingFormValues {
   plan: DailyPlan[];
 }
@@ -89,6 +77,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
   const [originalTopic, setOriginalTopic] = useState<string | null>(null);
   const [generatedPlanDetails, setGeneratedPlanDetails] = useState<GeneratedPlanDetails | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const userId = "hr_admin_user"; // Placeholder
 
   const { toast } = useToast();
 
@@ -197,14 +186,15 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
           ...data,
           duration: parseInt(data.duration, 10),
           companyId,
+          userId,
+          planParser: parseLessonPlan,
         });
-        
-        const parsedPlan = parseLessonPlan(result.lessonPlan);
         
         setGeneratedPlanDetails({
           ...data,
-          plan: parsedPlan,
+          plan: result.parsedPlan,
         });
+
       } catch (error) {
         console.error(error);
         toast({
@@ -357,7 +347,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
             <CardTitle>Temporary Track Preview</CardTitle>
             {generatedPlanDetails ? (
                 <CardDescription>
-                  <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetais.learningScope})
+                  <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
                 </CardDescription>
             ) : (
                 <CardDescription>

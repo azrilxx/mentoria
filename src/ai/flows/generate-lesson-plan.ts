@@ -14,13 +14,16 @@ import {
   getCustomModulesByTags,
   getSopsByTags,
   saveOnboardingTrack,
-  Law,
-  CustomModule,
-  Sop,
   getLawsByIds,
 } from '@/services/firebase';
+import { DailyPlanSchema, SopLinkSchema } from '@/lib/schemas';
+import type { DailyPlan, SopLink } from '@/lib/schemas';
 
-const GenerateLessonPlanInputSchema = z.object({
+
+export { type DailyPlan, type SopLink };
+
+
+export const GenerateLessonPlanInputSchema = z.object({
   trainingFocus: z
     .string()
     .describe('The main topic or focus of the training.'),
@@ -38,6 +41,8 @@ const GenerateLessonPlanInputSchema = z.object({
     .number()
     .describe('The duration of the training track in days (2, 5, or 7).'),
   companyId: z.string().describe('The ID of the company requesting the plan.'),
+  userId: z.string().describe('The ID of the user creating the plan.'),
+  planParser: z.function().args(z.string()).returns(z.array(DailyPlanSchema)),
 });
 export type GenerateLessonPlanInput = z.infer<
   typeof GenerateLessonPlanInputSchema
@@ -46,19 +51,21 @@ export type GenerateLessonPlanInput = z.infer<
 const GenerateLessonPlanOutputSchema = z.object({
   lessonPlan: z.string().describe('The generated lesson plan as a string.'),
   trackId: z.string().describe('The ID of the saved onboarding track document.'),
+  parsedPlan: z.array(DailyPlanSchema).describe('The parsed lesson plan structure.'),
 });
 export type GenerateLessonPlanOutput = z.infer<
   typeof GenerateLessonPlanOutputSchema
 >;
 
-const PromptInputSchema = z.intersection(
-  GenerateLessonPlanInputSchema,
-  z.object({
-    laws: z.string().optional(),
-    customModules: z.string().optional(),
-    sops: z.string().optional(),
-  })
-);
+const PromptInputSchema = z.object({
+  trainingFocus: z.string(),
+  seniorityLevel: z.string(),
+  learningScope: z.string(),
+  duration: z.number(),
+  laws: z.string().optional(),
+  customModules: z.string().optional(),
+  sops: z.string().optional(),
+});
 
 export async function generateLessonPlan(
   input: GenerateLessonPlanInput
@@ -164,7 +171,10 @@ const generateLessonPlanFlow = ai.defineFlow(
       .join('\n\n');
 
     const promptInput = {
-      ...input,
+      trainingFocus: input.trainingFocus,
+      seniorityLevel: input.seniorityLevel,
+      learningScope: input.learningScope,
+      duration: input.duration,
       laws: lawsText,
       customModules: customModulesText,
       sops: sopsText,
@@ -176,18 +186,27 @@ const generateLessonPlanFlow = ai.defineFlow(
       throw new Error('Failed to generate lesson plan content.');
     }
     
+    const parsedPlan = input.planParser(output.lessonPlan);
+    
     const trackId = await saveOnboardingTrack({
-      ...input,
-      resolvedLaws: relevantLaws.map(l => l.id),
-      includedCustomModules: customModules.map(m => m.id),
-      includedSops: relevantSops.map(s => s.id!),
-      generatedModules: [], // This could be populated by a more complex parsing of the output
-      generatedPlanText: output.lessonPlan,
+      trainingFocus: input.trainingFocus,
+      clarifiedTopic: input.trainingFocus,
+      duration: input.duration,
+      seniorityLevel: input.seniorityLevel,
+      learningScope: input.learningScope,
+      companyId: input.companyId,
+      createdBy: input.userId,
+      plan: parsedPlan,
+      status: 'draft',
+      branding: {
+        companyName: "Desaria Group", // Placeholder
+      }
     });
 
     return {
       lessonPlan: output.lessonPlan,
       trackId,
+      parsedPlan,
     };
   }
 );
