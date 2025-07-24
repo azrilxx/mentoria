@@ -1,3 +1,4 @@
+
 import {z} from 'zod';
 
 export const SopLinkSchema = z.object({
@@ -43,6 +44,7 @@ export const UserSchema = z.object({
   email: z.string().email(),
   subscriptionTier: z.enum(['free', 'premium', 'enterprise']),
   companyId: z.string().optional(),
+  role: z.string().optional(),
 });
 export type User = z.infer<typeof UserSchema>;
 

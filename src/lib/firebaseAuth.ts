@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -28,8 +29,14 @@ export const db = getFirestore(app);
 // Auth helper functions
 export interface AuthResult {
   success: boolean;
-  user?: User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; }; // Enhance User type
+  user?: User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?: string; }; // Enhance User type
   error?: string;
+}
+
+export interface UserSettings {
+  legalAlerts: boolean;
+  newTrackAlerts: boolean;
+  digestFrequency: 'daily' | 'weekly' | 'off';
 }
 
 // Helper function to convert username to email format
@@ -55,8 +62,9 @@ export const signInUser = async (emailOrUsername: string, password: string): Pro
           displayName: 'HR Test User',
           emailVerified: true,
           subscriptionTier: 'premium', // Assign a default premium tier for demo
-          companyId: 'desaria-group', // Assign a default company for demo
-        } as User & { subscriptionTier: 'premium'; companyId: string; };
+          companyId: 'desaria-group-123', // Assign a default company for demo
+          role: 'Admin',
+        } as User & { subscriptionTier: 'premium'; companyId: string; role: string };
 
         // Store in localStorage for persistence
         localStorage.setItem('mockAuthUser', JSON.stringify(mockUser));
@@ -91,10 +99,10 @@ export const signInUser = async (emailOrUsername: string, password: string): Pro
     const userDocRef = doc(db, "users", user.uid);
     const userDocSnap = await getDoc(userDocRef);
 
-    let userData: (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; });
+    let userData: (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?: string; });
 
     if (userDocSnap.exists()) {
-      userData = { ...user, ...userDocSnap.data() as { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; } };
+      userData = { ...user, ...userDocSnap.data() as { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?: string; } };
     } else {
       // If user document doesn't exist, create it with a default free tier
       // In a real invite-only system, this flow would be more controlled (e.g., via Cloud Functions)
@@ -102,6 +110,7 @@ export const signInUser = async (emailOrUsername: string, password: string): Pro
         uid: user.uid,
         email: user.email,
         subscriptionTier: 'free',
+        role: 'User',
         // companyId would be set during invite acceptance or initial company setup
       };
       await setDoc(userDocRef, defaultUserData);
@@ -143,7 +152,7 @@ export const signOutUser = async (): Promise<AuthResult> => {
   }
 };
 
-export const onAuthStateChange = (callback: (user: (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; }) | null) => void) => {
+export const onAuthStateChange = (callback: (user: (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?:string }) | null) => void) => {
   // Development mode: Mock auth state change
   if (process.env.NODE_ENV === 'development') {
     // Initial call with current user
@@ -170,9 +179,9 @@ export const onAuthStateChange = (callback: (user: (User & { subscriptionTier?: 
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
-        callback({ ...user, ...userDocSnap.data() as { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; } });
+        callback({ ...user, ...userDocSnap.data() as { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?:string } });
       } else {
-        callback(user); // Return basic user if no doc exists
+        callback(user as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?:string })); // Return basic user if no doc exists
       }
     } else {
       callback(null);
@@ -203,14 +212,14 @@ const getAuthErrorMessage = (errorCode: string): string => {
 };
 
 // Check if user is authenticated
-export const getCurrentUser = (): (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; }) | null => {
+export const getCurrentUser = (): (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?:string }) | null => {
   // Development mode: Check for mock user
   if (process.env.NODE_ENV === 'development') {
     if (typeof window !== 'undefined') {
       const mockUserData = localStorage.getItem('mockAuthUser');
       if (mockUserData) {
         try {
-          return JSON.parse(mockUserData) as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; });
+          return JSON.parse(mockUserData) as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?:string });
         } catch {
           localStorage.removeItem('mockAuthUser');
         }
@@ -224,7 +233,7 @@ export const getCurrentUser = (): (User & { subscriptionTier?: 'free' | 'premium
   if (currentUser) {
     // This will ideally be fetched from Firestore, but for a quick synchronous check
     // we can return the basic user here. Asynchronous fetching is done in onAuthStateChange.
-    return currentUser as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; });
+    return currentUser as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; role?:string });
   }
   return null;
 };
@@ -255,4 +264,29 @@ export const checkPendingInvite = async (email: string) => {
     return PendingInviteSchema.parse(inviteDocSnap.data());
   }
   return null;
+};
+
+// Mock user settings storage
+const MOCK_USER_SETTINGS: { [uid: string]: UserSettings } = {
+    'demo-user-123': {
+        legalAlerts: true,
+        newTrackAlerts: true,
+        digestFrequency: 'weekly',
+    }
+};
+
+// Functions to get and save user settings
+export const getUserSettings = async (uid: string): Promise<UserSettings> => {
+    // In a real app, this would fetch from /users/{uid}/notificationPrefs
+    return MOCK_USER_SETTINGS[uid] || {
+        legalAlerts: false,
+        newTrackAlerts: true,
+        digestFrequency: 'off',
+    };
+};
+
+export const saveUserSettings = async (uid: string, settings: UserSettings): Promise<void> => {
+    // In a real app, this would write to /users/{uid}/notificationPrefs
+    MOCK_USER_SETTINGS[uid] = settings;
+    console.log(`Saved settings for user ${uid}:`, settings);
 };
