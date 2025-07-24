@@ -35,3 +35,32 @@ export const DailyPlanSchema = z.object({
   sops: z.array(SopLinkSchema),
 });
 export type DailyPlan = z.infer<typeof DailyPlanSchema>;
+
+// New schemas for Stage 16
+
+export const UserSchema = z.object({
+  uid: z.string(),
+  email: z.string().email(),
+  subscriptionTier: z.enum(['free', 'premium', 'enterprise']),
+  companyId: z.string().optional(),
+});
+export type User = z.infer<typeof UserSchema>;
+
+export const CompanySchema = z.object({
+  companyId: z.string(),
+  name: z.string(),
+  branding: z.object({
+    primaryColor: z.string().optional(),
+    watermarkText: z.string().optional(),
+    logoUrl: z.string().optional(),
+  }),
+});
+export type Company = z.infer<typeof CompanySchema>;
+
+export const PendingInviteSchema = z.object({
+  companyEmail: z.string().email(),
+  invitedBy: z.string(),
+  timestamp: z.date(),
+  status: z.enum(['pending', 'accepted', 'expired']),
+});
+export type PendingInvite = z.infer<typeof PendingInviteSchema>;

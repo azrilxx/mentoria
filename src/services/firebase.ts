@@ -125,6 +125,22 @@ export type OnboardingTrack = z.infer<typeof OnboardingTrackSchema>;
 export type LegalReference = z.infer<typeof LegalReferenceSchema>;
 export type CompanyPolicyReference = z.infer<typeof CompanyPolicyReferenceSchema>;
 
+// User Progress Tracking Schema
+export const UserProgressSchema = z.object({
+  id: z.string().optional(),
+  trackId: z.string(),
+  status: z.enum(["draft", "confirmed", "archived"]),
+  generatedAt: z.string(),
+  lastViewed: z.string(),
+  confirmedAt: z.string().optional(),
+  duration: z.number(),
+  topic: z.string(),
+  scope: z.string(),
+  seniority: z.string(),
+});
+
+export type UserProgress = z.infer<typeof UserProgressSchema>;
+
 
 // MOCK DATABASE
 const MOCK_LAWS: Law[] = [
@@ -211,6 +227,9 @@ let MOCK_ONBOARDING_TRACKS: OnboardingTrack[] = [];
 
 // `legalLibrary` collection (from legal ingestion engine)
 let MOCK_LEGAL_LIBRARY: LegalDocument[] = [];
+
+// User Progress Tracking Mock Storage
+let MOCK_USER_PROGRESS: { [uid: string]: UserProgress[] } = {};
 
 
 // SIMULATED FIRESTORE FUNCTIONS
@@ -365,4 +384,70 @@ export async function clearLegalLibraryFirebase(): Promise<void> {
 export async function updateLegalLibraryBatch(documents: LegalDocument[]): Promise<void> {
     MOCK_LEGAL_LIBRARY = [...documents];
     console.log(`Updated legal library with ${documents.length} documents`);
+}
+
+// USER PROGRESS TRACKING FUNCTIONS
+
+export async function saveUserProgress(uid: string, progressData: Omit<UserProgress, 'id'>): Promise<string> {
+    console.log(`Saving progress for user ${uid}, trackId: ${progressData.trackId}`);
+    
+    if (!MOCK_USER_PROGRESS[uid]) {
+        MOCK_USER_PROGRESS[uid] = [];
+    }
+    
+    const newProgress: UserProgress = {
+        ...progressData,
+        id: `progress_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    };
+    
+    MOCK_USER_PROGRESS[uid].push(newProgress);
+    console.log(`Saved progress with ID: ${newProgress.id}`);
+    return newProgress.id!;
+}
+
+export async function getUserProgress(uid: string): Promise<UserProgress[]> {
+    console.log(`Fetching progress for user ${uid}`);
+    if (!MOCK_USER_PROGRESS[uid]) {
+        MOCK_USER_PROGRESS[uid] = [];
+    }
+    return [...MOCK_USER_PROGRESS[uid]].sort((a, b) => 
+        new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+    );
+}
+
+export async function updateUserProgress(uid: string, progressId: string, updates: Partial<UserProgress>): Promise<void> {
+    console.log(`Updating progress ${progressId} for user ${uid}`);
+    
+    if (!MOCK_USER_PROGRESS[uid]) {
+        console.warn(`No progress found for user ${uid}`);
+        return;
+    }
+    
+    const progressIndex = MOCK_USER_PROGRESS[uid].findIndex(p => p.id === progressId);
+    if (progressIndex === -1) {
+        console.warn(`Progress ${progressId} not found for user ${uid}`);
+        return;
+    }
+    
+    MOCK_USER_PROGRESS[uid][progressIndex] = {
+        ...MOCK_USER_PROGRESS[uid][progressIndex],
+        ...updates,
+    };
+    
+    console.log(`Updated progress ${progressId}`);
+}
+
+export async function getUserProgressByTrackId(uid: string, trackId: string): Promise<UserProgress | null> {
+    console.log(`Fetching progress for user ${uid} and track ${trackId}`);
+    
+    if (!MOCK_USER_PROGRESS[uid]) {
+        return null;
+    }
+    
+    return MOCK_USER_PROGRESS[uid].find(p => p.trackId === trackId) || null;
+}
+
+export async function getOnboardingTrackById(trackId: string): Promise<OnboardingTrack | null> {
+    console.log(`Fetching onboarding track with ID: ${trackId}`);
+    return MOCK_ONBOARDING_TRACKS.find(track => track.id === trackId) || null;
 }

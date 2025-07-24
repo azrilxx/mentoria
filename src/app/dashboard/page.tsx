@@ -18,6 +18,8 @@ import { Icons } from '@/components/icons';
 import { LogOut, User as UserIcon, Settings, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { OnboardingPlanner } from '@/components/onboarding-planner';
+import { MyPlans } from '@/components/my-plans';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -200,7 +202,18 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <OnboardingPlanner companyId={companyId} />
+        <Tabs defaultValue="generate" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="generate">Generate Plan</TabsTrigger>
+            <TabsTrigger value="my-plans">My Plans</TabsTrigger>
+          </TabsList>
+          <TabsContent value="generate" className="mt-8">
+            <OnboardingPlanner companyId={companyId} />
+          </TabsContent>
+          <TabsContent value="my-plans" className="mt-8">
+            <MyPlans companyId={companyId} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

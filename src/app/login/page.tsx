@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChange, getCurrentUser } from '@/lib/firebaseAuth';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { Icons } from '@/components/icons';
+import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -32,26 +34,30 @@ export default function LoginPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+      <div className="min-h-screen flex items-center justify-center bg-background font-sans">
         <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading...</span>
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-lg font-pt-sans">Loading Mentoria...</span>
+          <div className="relative overflow-hidden h-4 w-32 rounded-md bg-muted ml-4">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer"></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="min-h-screen flex flex-col bg-background font-sans">
       {/* Header with company branding */}
-      <header className="w-full py-6 px-4">
+      <header className="w-full py-6 px-4 border-b border-border bg-card">
         <div className="max-w-6xl mx-auto">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <Icons.logo className="h-10 w-10 text-primary mx-auto mb-2" />
+            <h1 className="text-2xl font-bold text-foreground font-montserrat">
               Mentoria Onboard
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Witventure Learning Experience Platform
+            <p className="text-sm text-muted-foreground mt-1 font-pt-sans">
+              Your AI-Assisted Onboarding Partner
             </p>
           </div>
         </div>
@@ -62,10 +68,10 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Welcome message */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            <h2 className="text-3xl font-bold text-foreground mb-2 font-montserrat">
               Welcome back!
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-muted-foreground text-lg font-pt-sans">
               Sign in to continue your onboarding journey
             </p>
           </div>
@@ -75,7 +81,7 @@ export default function LoginPage() {
 
           {/* Additional information */}
           <div className="mt-8 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground font-pt-sans">
               Need help? Contact your HR administrator or{' '}
               <a 
                 href="mailto:support@witventure.com" 
@@ -89,9 +95,9 @@ export default function LoginPage() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full py-6 px-4 border-t bg-white/50">
+      <footer className="w-full py-6 px-4 border-t border-border bg-card">
         <div className="max-w-6xl mx-auto text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground font-pt-sans">
             © 2025 Desaria Group. Powered by Mentoria Onboard.
           </p>
         </div>

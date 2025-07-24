@@ -1,12 +1,14 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  signOut, 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
   onAuthStateChanged,
   User,
-  AuthError
+  AuthError,
 } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { UserSchema, CompanySchema, PendingInviteSchema } from './schemas';
 
 // Firebase configuration - In production, these should be environment variables
 const firebaseConfig = {
@@ -21,11 +23,12 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 // Auth helper functions
 export interface AuthResult {
   success: boolean;
-  user?: User;
+  user?: User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; }; // Enhance User type
   error?: string;
 }
 
@@ -40,7 +43,7 @@ const normalizeEmailInput = (input: string): string => {
 
 export const signInUser = async (emailOrUsername: string, password: string): Promise<AuthResult> => {
   const email = normalizeEmailInput(emailOrUsername);
-  
+
   // Development mode: Mock authentication for demo user
   if (process.env.NODE_ENV === 'development') {
     if (emailOrUsername === DEMO_USER.username || email === DEMO_USER.email) {
@@ -50,15 +53,17 @@ export const signInUser = async (emailOrUsername: string, password: string): Pro
           uid: 'demo-user-123',
           email: DEMO_USER.email,
           displayName: 'HR Test User',
-          emailVerified: true
-        } as User;
-        
+          emailVerified: true,
+          subscriptionTier: 'premium', // Assign a default premium tier for demo
+          companyId: 'desaria-group', // Assign a default company for demo
+        } as User & { subscriptionTier: 'premium'; companyId: string; };
+
         // Store in localStorage for persistence
         localStorage.setItem('mockAuthUser', JSON.stringify(mockUser));
-        
+
         // Trigger a custom event to notify auth state change
         window.dispatchEvent(new Event('storage'));
-        
+
         return {
           success: true,
           user: mockUser
@@ -76,13 +81,36 @@ export const signInUser = async (emailOrUsername: string, password: string): Pro
       };
     }
   }
-  
+
   // Production mode: Use Firebase Auth
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Fetch user details from Firestore
+    const userDocRef = doc(db, "users", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    let userData: (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; });
+
+    if (userDocSnap.exists()) {
+      userData = { ...user, ...userDocSnap.data() as { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; } };
+    } else {
+      // If user document doesn't exist, create it with a default free tier
+      // In a real invite-only system, this flow would be more controlled (e.g., via Cloud Functions)
+      const defaultUserData = {
+        uid: user.uid,
+        email: user.email,
+        subscriptionTier: 'free',
+        // companyId would be set during invite acceptance or initial company setup
+      };
+      await setDoc(userDocRef, defaultUserData);
+      userData = { ...user, ...defaultUserData };
+    }
+
     return {
       success: true,
-      user: userCredential.user
+      user: userData
     };
   } catch (error) {
     const authError = error as AuthError;
@@ -101,7 +129,7 @@ export const signOutUser = async (): Promise<AuthResult> => {
     window.dispatchEvent(new Event('storage'));
     return { success: true };
   }
-  
+
   // Production mode: Use Firebase Auth
   try {
     await signOut(auth);
@@ -115,29 +143,41 @@ export const signOutUser = async (): Promise<AuthResult> => {
   }
 };
 
-export const onAuthStateChange = (callback: (user: User | null) => void) => {
+export const onAuthStateChange = (callback: (user: (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; }) | null) => void) => {
   // Development mode: Mock auth state change
   if (process.env.NODE_ENV === 'development') {
     // Initial call with current user
     const currentUser = getCurrentUser();
     callback(currentUser);
-    
+
     // Listen for localStorage changes (for logout)
     const handleStorageChange = () => {
       const mockUser = getCurrentUser();
       callback(mockUser);
     };
-    
+
     window.addEventListener('storage', handleStorageChange);
-    
+
     // Return cleanup function
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
   }
-  
+
   // Production mode: Use Firebase Auth
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        callback({ ...user, ...userDocSnap.data() as { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; } });
+      } else {
+        callback(user); // Return basic user if no doc exists
+      }
+    } else {
+      callback(null);
+    }
+  });
 };
 
 // Helper function to convert Firebase auth error codes to user-friendly messages
@@ -163,14 +203,14 @@ const getAuthErrorMessage = (errorCode: string): string => {
 };
 
 // Check if user is authenticated
-export const getCurrentUser = (): User | null => {
+export const getCurrentUser = (): (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; }) | null => {
   // Development mode: Check for mock user
   if (process.env.NODE_ENV === 'development') {
     if (typeof window !== 'undefined') {
       const mockUserData = localStorage.getItem('mockAuthUser');
       if (mockUserData) {
         try {
-          return JSON.parse(mockUserData) as User;
+          return JSON.parse(mockUserData) as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; });
         } catch {
           localStorage.removeItem('mockAuthUser');
         }
@@ -178,9 +218,15 @@ export const getCurrentUser = (): User | null => {
     }
     return null;
   }
-  
+
   // Production mode: Use Firebase Auth
-  return auth.currentUser;
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    // This will ideally be fetched from Firestore, but for a quick synchronous check
+    // we can return the basic user here. Asynchronous fetching is done in onAuthStateChange.
+    return currentUser as (User & { subscriptionTier?: 'free' | 'premium' | 'enterprise'; companyId?: string; });
+  }
+  return null;
 };
 
 // Demo user credentials for development
@@ -189,4 +235,24 @@ export const DEMO_USER = {
   password: 'manor123',
   // For Firebase Auth, we'll append a domain to make it a valid email
   email: 'zaleha@witventure.com'
+};
+
+// New functions for Stage 16
+
+export const getCompanyBranding = async (companyId: string) => {
+  const companyDocRef = doc(db, "companies", companyId);
+  const companyDocSnap = await getDoc(companyDocRef);
+  if (companyDocSnap.exists()) {
+    return CompanySchema.parse(companyDocSnap.data()).branding;
+  }
+  return null;
+};
+
+export const checkPendingInvite = async (email: string) => {
+  const inviteDocRef = doc(db, "pendingInvites", email);
+  const inviteDocSnap = await getDoc(inviteDocRef);
+  if (inviteDocSnap.exists()) {
+    return PendingInviteSchema.parse(inviteDocSnap.data());
+  }
+  return null;
 };

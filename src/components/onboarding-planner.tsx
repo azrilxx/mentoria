@@ -55,6 +55,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ProgressTrackingService } from "@/services/progress-tracking";
+import { getCurrentUser } from "@/lib/firebaseAuth";
 
 const formSchema = z.object({
   trainingFocus: z.string().min(2, {
@@ -84,8 +86,11 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
   const [feedback, setFeedback] = useState("");
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
-  const userId = "hr_admin_user"; // Placeholder
+  const currentUser = getCurrentUser();
+  const userId = currentUser?.uid || "hr_admin_user"; // Use actual user ID or fallback
 
   const { toast } = useToast();
 
@@ -99,8 +104,10 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
   useEffect(() => {
     if (generatedPlanDetails) {
       previewRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Update lastViewed timestamp when plan is viewed
+      ProgressTrackingService.updateLastViewed(userId, generatedPlanDetails.trackId);
     }
-  }, [generatedPlanDetails]);
+  }, [generatedPlanDetails, userId]);
 
   const handleFocusBlur = async () => {
     const trainingFocus = form.getValues("trainingFocus");
@@ -142,12 +149,22 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
       setIsAcknowledged(false);
       setFeedback("");
       setFeedbackSubmitted(false);
+      setIsConfirmed(false);
       try {
         const result = await generateLessonPlan({
           ...data,
           duration: parseInt(data.duration, 10),
           companyId,
           userId,
+        });
+        
+        // Save progress to user's progress collection
+        await ProgressTrackingService.createProgress(userId, {
+          trackId: result.trackId,
+          duration: parseInt(data.duration, 10),
+          topic: clarifiedTopic || data.trainingFocus,
+          scope: data.learningScope,
+          seniority: data.seniorityLevel,
         });
         
         setGeneratedPlanDetails({
@@ -211,6 +228,28 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
       } finally {
           setIsSubmittingFeedback(false);
       }
+  };
+
+  const handleConfirmPlan = async () => {
+    if (!generatedPlanDetails?.trackId) return;
+    setIsConfirming(true);
+    try {
+      await ProgressTrackingService.confirmPlan(userId, generatedPlanDetails.trackId);
+      setIsConfirmed(true);
+      toast({
+        title: "Plan Confirmed",
+        description: "Your training plan has been confirmed and is ready to use.",
+      });
+    } catch (error) {
+      console.error("Failed to confirm plan", error);
+      toast({
+        variant: "destructive",
+        title: "Confirmation Failed",
+        description: "Could not confirm your plan. Please try again.",
+      });
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   const isLoading = isPending || isGenerating;
@@ -365,7 +404,15 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
           <>
             <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
               <CardHeader>
-                <CardTitle>Temporary Track Preview</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Training Plan Preview</span>
+                  {isConfirmed && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Confirmed
+                    </Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>
                   <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
                 </CardDescription>
@@ -423,6 +470,27 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                   </p>
                 )}
               </CardContent>
+              <CardFooter>
+                <Button 
+                  onClick={handleConfirmPlan} 
+                  disabled={isConfirmed || isConfirming}
+                  className="bg-[#74b49b] hover:bg-[#5a9b84] text-white"
+                >
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : isConfirmed ? (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Plan Confirmed
+                    </>
+                  ) : (
+                    "Confirm Plan"
+                  )}
+                </Button>
+              </CardFooter>
             </Card>
 
             <Card className="mt-6 w-full shadow-lg border-2 border-border/50">
