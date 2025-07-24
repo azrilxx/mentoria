@@ -4,6 +4,7 @@ import { Icons } from "@/components/icons";
 export default function Home() {
   const companyName = "Desaria Group";
   const sector = "Real Estate";
+  const companyId = "desaria-group-123"; // Placeholder
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center bg-background">
@@ -20,7 +21,7 @@ export default function Home() {
             Custom onboarding builder for {sector} compliance.
           </p>
         </header>
-        <OnboardingPlanner />
+        <OnboardingPlanner companyId={companyId} />
       </div>
     </main>
   );

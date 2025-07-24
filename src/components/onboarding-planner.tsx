@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogHeader,
@@ -71,7 +72,7 @@ interface GeneratedPlanDetails extends OnboardingFormValues {
   plan: DailyPlan[];
 }
 
-export function OnboardingPlanner() {
+export function OnboardingPlanner({ companyId }: { companyId: string }) {
   const [isPending, startTransition] = useTransition();
   const [isClarifying, setIsClarifying] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -102,8 +103,8 @@ export function OnboardingPlanner() {
       setIsClarifying(true);
       setOriginalTopic(trainingFocus);
       try {
-        const result = await interpretTrainingFocus({ trainingFocus });
-        setSuggestedTopics(result.suggestedTopics);
+        const result = await interpretTrainingFocus({ userInput: trainingFocus });
+        setSuggestedTopics(result.suggestedTopics.map(t => t.title));
       } catch (error) {
         toast({
           variant: "destructive",
@@ -122,6 +123,12 @@ export function OnboardingPlanner() {
     setIsClarifying(false);
     setOriginalTopic(null);
   };
+  
+  const closeClarificationDialog = () => {
+    setIsClarifying(false);
+    setSuggestedTopics([]);
+    setOriginalTopic(null);
+  }
 
   const parseLessonPlan = (plan: string): DailyPlan[] => {
     const lines = plan.split('\n').filter(line => line.trim() !== '');
@@ -129,7 +136,7 @@ export function OnboardingPlanner() {
     let currentPlan: DailyPlan | null = null;
 
     for (const line of lines) {
-      const dayMatch = line.match(/^Day (\d+): (.*)/);
+      const dayMatch = line.match(/^Day (\d+): (.*)/i);
       if (dayMatch) {
         if (currentPlan) {
           dailyPlans.push(currentPlan);
@@ -140,7 +147,13 @@ export function OnboardingPlanner() {
           modules: [],
         };
       } else if (currentPlan && (line.trim().startsWith('-') || line.trim().startsWith('*'))) {
-        currentPlan.modules.push(line.trim().substring(2));
+        let moduleText = line.trim().substring(line.indexOf(' ')+1).trim();
+        currentPlan.modules.push(moduleText);
+      } else if (currentPlan && line.trim()) {
+        // Fallback for lines that are not module items
+        if(currentPlan.modules.length > 0){
+          currentPlan.modules[currentPlan.modules.length - 1] += `\n${line.trim()}`;
+        }
       }
     }
 
@@ -158,6 +171,7 @@ export function OnboardingPlanner() {
         const result = await generateLessonPlan({
           ...data,
           duration: parseInt(data.duration, 10),
+          companyId,
         });
         const parsedPlan = parseLessonPlan(result.lessonPlan);
         setGeneratedPlanDetails({
@@ -165,6 +179,7 @@ export function OnboardingPlanner() {
           plan: parsedPlan,
         });
       } catch (error) {
+        console.error(error);
         toast({
           variant: "destructive",
           title: "Error Generating Plan",
@@ -359,12 +374,12 @@ export function OnboardingPlanner() {
       </div>
 
 
-      <AlertDialog open={suggestedTopics.length > 0 && isClarifying}>
+      <AlertDialog open={isClarifying && suggestedTopics.length > 0}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Clarify Training Focus</AlertDialogTitle>
             <AlertDialogDescription>
-              You entered '{originalTopic}'. Did you mean:
+              You entered '{originalTopic}'. Did you mean one of these?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col space-y-2">
@@ -380,6 +395,7 @@ export function OnboardingPlanner() {
               ))
             )}
           </div>
+           <AlertDialogCancel onClick={closeClarificationDialog}>Keep my input</AlertDialogCancel>
         </AlertDialogContent>
       </AlertDialog>
     </>
