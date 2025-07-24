@@ -57,16 +57,7 @@ export function MyPlans({ companyId }: MyPlansProps) {
     try {
       // Update lastViewed timestamp
       await ProgressTrackingService.updateLastViewed(userId, trackId);
-      
-      // Refresh the plans list to show updated lastViewed time
-      await loadUserPlans();
-      
-      // Navigate to view the plan (you can customize this route)
-      // For now, we'll just show a toast
-      toast({
-        title: "Plan Viewed",
-        description: "Plan view updated. In a full implementation, this would navigate to the plan details.",
-      });
+      router.push(`/track/${trackId}`);
     } catch (error) {
       console.error("Failed to view plan:", error);
       toast({
@@ -74,7 +65,6 @@ export function MyPlans({ companyId }: MyPlansProps) {
         title: "Failed to View Plan",
         description: "Could not open the plan. Please try again.",
       });
-    } finally {
       setLoadingPlanId(null);
     }
   };

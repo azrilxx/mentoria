@@ -329,6 +329,12 @@ export async function saveOnboardingTrack(trackData: Omit<OnboardingTrack, 'id' 
     return newTrack.id!;
 }
 
+export async function getOnboardingTrackById(trackId: string): Promise<OnboardingTrack | null> {
+    console.log(`Fetching onboarding track with ID: ${trackId}`);
+    const track = MOCK_ONBOARDING_TRACKS.find(track => track.id === trackId);
+    return track || null;
+}
+
 // LEGAL LIBRARY FUNCTIONS
 
 export async function searchLegalLibrary(query: string): Promise<LegalDocument[]> {
@@ -445,9 +451,4 @@ export async function getUserProgressByTrackId(uid: string, trackId: string): Pr
     }
     
     return MOCK_USER_PROGRESS[uid].find(p => p.trackId === trackId) || null;
-}
-
-export async function getOnboardingTrackById(trackId: string): Promise<OnboardingTrack | null> {
-    console.log(`Fetching onboarding track with ID: ${trackId}`);
-    return MOCK_ONBOARDING_TRACKS.find(track => track.id === trackId) || null;
 }
