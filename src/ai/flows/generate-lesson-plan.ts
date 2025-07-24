@@ -50,30 +50,6 @@ export type GenerateLessonPlanOutput = z.infer<
   typeof GenerateLessonPlanOutputSchema
 >;
 
-const LawSectionSchema = z.object({
-  section: z.string(),
-  title: z.string(),
-  summary: z.string(),
-});
-
-const LawSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  sections: z.array(LawSectionSchema),
-});
-
-const CustomModuleSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  content: z.string(),
-});
-
-const SopSchema = z.object({
-  id: z.string(),
-  fileName: z.string(),
-  fileUrl: z.string(),
-});
-
 const PromptInputSchema = z.intersection(
   GenerateLessonPlanInputSchema,
   z.object({
@@ -125,7 +101,7 @@ INSTRUCTIONS:
 2. For each day, create a clear title (e.g., "Day 1: Introduction to the Strata Management Act").
 3. For each day, list 2-4 specific modules as bullet points. Each module MUST start with '- '.
 4. Each module must be derived from the provided Law Sections or Company SOPs. You can summarize or rephrase, but stick to the source material.
-5. If relevant Company Documents (SOPs) are available, add a section at the end of the day's modules titled "Related SOPs:" and list the relevant document titles.
+5. If relevant Company Documents (SOPs) are available, add a section at the end of the day's modules titled "Related SOPs:" and list the relevant document titles in the format '- SOP Document: [Filename] (link: [URL])'.
 6. Ensure the complexity of the modules matches the {{seniorityLevel}} and {{learningScope}}.
 7. The tone must be professional and suitable for a Malaysian corporate environment.
 8. Output the entire plan as a single block of text, using markdown for formatting (e.g., Day 1: ..., - Module...).

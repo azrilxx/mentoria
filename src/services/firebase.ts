@@ -137,7 +137,7 @@ const MOCK_CUSTOM_MODULES: (CustomModule & { companyId: string })[] = [
     }
 ];
 
-const MOCK_SOPS: Sop[] = [
+let MOCK_SOPS: Sop[] = [
     {
         id: 'sop_audit_1',
         companyId: 'desaria-group-123',
