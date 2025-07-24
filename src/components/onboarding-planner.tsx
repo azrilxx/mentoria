@@ -130,36 +130,35 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
     setOriginalTopic(null);
   }
 
-  const parseLessonPlan = (plan: string): DailyPlan[] => {
-    const lines = plan.split('\n').filter(line => line.trim() !== '');
+  const parseLessonPlan = (planText: string): DailyPlan[] => {
+    if (!planText) return [];
+    
     const dailyPlans: DailyPlan[] = [];
-    let currentPlan: DailyPlan | null = null;
+    const dayBlocks = planText.split(/Day \d+:/).filter(Boolean);
 
-    for (const line of lines) {
-      const dayMatch = line.match(/^Day (\d+): (.*)/i);
-      if (dayMatch) {
-        if (currentPlan) {
-          dailyPlans.push(currentPlan);
-        }
-        currentPlan = {
-          day: `Day ${dayMatch[1]}`,
-          title: dayMatch[2],
-          modules: [],
-        };
-      } else if (currentPlan && (line.trim().startsWith('-') || line.trim().startsWith('*'))) {
-        let moduleText = line.trim().substring(line.indexOf(' ')+1).trim();
-        currentPlan.modules.push(moduleText);
-      } else if (currentPlan && line.trim()) {
-        // Fallback for lines that are not module items
-        if(currentPlan.modules.length > 0){
-          currentPlan.modules[currentPlan.modules.length - 1] += `\n${line.trim()}`;
-        }
+    const dayTitles = planText.match(/Day \d+:.*(?:\r\n|\r|\n)/g) || [];
+
+    dayBlocks.forEach((block, index) => {
+      const titleMatch = dayTitles[index]?.trim().match(/Day (\d+): (.*)/i);
+      if (!titleMatch) return;
+
+      const dayNumber = titleMatch[1];
+      const dayTitle = titleMatch[2];
+      
+      const modules = block.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.startsWith('- ') || line.startsWith('* '))
+        .map(line => line.substring(2).trim());
+
+      if (modules.length > 0) {
+        dailyPlans.push({
+          day: `Day ${dayNumber}`,
+          title: dayTitle,
+          modules: modules,
+        });
       }
-    }
+    });
 
-    if (currentPlan) {
-      dailyPlans.push(currentPlan);
-    }
     return dailyPlans;
   };
 
@@ -173,7 +172,10 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
           duration: parseInt(data.duration, 10),
           companyId,
         });
+        
+        console.log("🧪 lessonPlan result:", result.lessonPlan);
         const parsedPlan = parseLessonPlan(result.lessonPlan);
+        
         setGeneratedPlanDetails({
           ...data,
           plan: parsedPlan,
@@ -347,7 +349,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-8 w-3/4" />
               </div>
-            ) : generatedPlanDetails ? (
+            ) : generatedPlanDetails && generatedPlanDetails.plan.length > 0 ? (
               <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
                 {generatedPlanDetails.plan.map((item, index) => (
                   <AccordionItem value={`item-${index}`} key={index}>
@@ -364,6 +366,10 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                   </AccordionItem>
                 ))}
               </Accordion>
+            ) : generatedPlanDetails && generatedPlanDetails.plan.length === 0 ? (
+              <div className="text-center text-muted-foreground italic py-8">
+                 No training modules found for the selected criteria.
+              </div>
             ) : (
               <div className="text-center text-muted-foreground italic py-8">
                 No plan generated yet. Complete the fields and click Generate.

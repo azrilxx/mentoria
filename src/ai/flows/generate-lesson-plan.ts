@@ -109,7 +109,7 @@ Available Company-Specific Modules (SOPs, rules):
 INSTRUCTIONS:
 1. Create a day-by-day training plan for the specified {{duration}}.
 2. For each day, create a clear title (e.g., "Day 1: Introduction to the Strata Management Act").
-3. For each day, list 2-4 specific modules as bullet points.
+3. For each day, list 2-4 specific modules as bullet points. Each module MUST start with '- '.
 4. Each module must be derived from the provided Law Sections or Company SOPs. You can summarize or rephrase, but stick to the source material.
 5. Ensure the complexity of the modules matches the {{seniorityLevel}} and {{learningScope}}.
 6. The tone must be professional and suitable for a Malaysian corporate environment.
@@ -138,8 +138,8 @@ const generateLessonPlanFlow = ai.defineFlow(
         l =>
           `- Law: ${l.title}\n  Relevant Sections:\n` +
           l.sections
-            .slice(0, 5)
-            .map(s => `  - ${s.section}: ${s.title} - ${s.summary}`)
+            .slice(0, 5) // Limit for brevity in prompt
+            .map(s => `  - Section ${s.section} (${s.title}): ${s.summary}`)
             .join('\n')
       )
       .join('\n');
@@ -159,7 +159,7 @@ const generateLessonPlanFlow = ai.defineFlow(
     if (!output?.lessonPlan) {
       throw new Error('Failed to generate lesson plan content.');
     }
-
+    
     const trackId = await saveOnboardingTrack({
       ...input,
       resolvedLaws: relevantLaws.map(l => l.id),
