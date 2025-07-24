@@ -69,8 +69,8 @@ const CustomModuleSchema = z.object({
 const PromptInputSchema = z.intersection(
   GenerateLessonPlanInputSchema,
   z.object({
-    laws: z.array(LawSchema).optional(),
-    customModules: z.array(CustomModuleSchema).optional(),
+    laws: z.string().optional(),
+    customModules: z.string().optional(),
   })
 );
 
@@ -98,21 +98,12 @@ Use the following sources to build the daily modules. Prioritize official laws, 
 
 {{#if laws}}
 Available Malaysian Laws:
-{{#each laws}}
-- Law: {{title}}
-  Relevant Sections:
-  {{#each sections}}
-  - {{section}}: {{title}} - {{summary}}
-  {{/each}}
-{{/each}}
+{{{laws}}}
 {{/if}}
 
 {{#if customModules}}
 Available Company-Specific Modules (SOPs, rules):
-{{#each customModules}}
-- SOP: {{title}}
-  Content: {{content}}
-{{/each}}
+{{{customModules}}}
 {{/if}}
 
 INSTRUCTIONS:
@@ -141,19 +132,26 @@ const generateLessonPlanFlow = ai.defineFlow(
       getLawsByTags(domainTags),
       getCustomModulesByTags(input.companyId, domainTags),
     ]);
+    
+    const lawsText = relevantLaws
+      .map(
+        l =>
+          `- Law: ${l.title}\n  Relevant Sections:\n` +
+          l.sections
+            .slice(0, 5)
+            .map(s => `  - ${s.section}: ${s.title} - ${s.summary}`)
+            .join('\n')
+      )
+      .join('\n');
+
+    const customModulesText = customModules
+      .map(m => `- SOP: ${m.title}\n  Content: ${m.content}`)
+      .join('\n');
 
     const promptInput = {
       ...input,
-      laws: relevantLaws.map(l => ({
-        id: l.id,
-        title: l.title,
-        sections: l.sections.slice(0, 5), // Limit sections to keep prompt size manageable
-      })),
-      customModules: customModules.map(m => ({
-        id: m.id,
-        title: m.title,
-        content: m.content,
-      })),
+      laws: lawsText,
+      customModules: customModulesText,
     };
 
     const {output} = await prompt(promptInput);
