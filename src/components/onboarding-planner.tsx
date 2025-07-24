@@ -67,6 +67,10 @@ interface DailyPlan {
   modules: string[];
 }
 
+interface GeneratedPlanDetails extends OnboardingFormValues {
+  plan: DailyPlan[];
+}
+
 export function OnboardingPlanner() {
   const [isPending, startTransition] = useTransition();
   const [isClarifying, setIsClarifying] = useState(false);
@@ -74,7 +78,7 @@ export function OnboardingPlanner() {
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
   const [clarifiedTopic, setClarifiedTopic] = useState<string | null>(null);
   const [originalTopic, setOriginalTopic] = useState<string | null>(null);
-  const [generatedPlan, setGeneratedPlan] = useState<DailyPlan[] | null>(null);
+  const [generatedPlanDetails, setGeneratedPlanDetails] = useState<GeneratedPlanDetails | null>(null);
 
   const { toast } = useToast();
 
@@ -142,14 +146,17 @@ export function OnboardingPlanner() {
   const onSubmit = (data: OnboardingFormValues) => {
     startTransition(async () => {
       setIsGenerating(true);
-      setGeneratedPlan(null);
+      setGeneratedPlanDetails(null);
       try {
         const result = await generateLessonPlan({
           ...data,
           duration: parseInt(data.duration, 10),
         });
         const parsedPlan = parseLessonPlan(result.lessonPlan);
-        setGeneratedPlan(parsedPlan);
+        setGeneratedPlanDetails({
+          ...data,
+          plan: parsedPlan,
+        });
       } catch (error) {
         toast({
           variant: "destructive",
@@ -295,44 +302,52 @@ export function OnboardingPlanner() {
         </Form>
       </Card>
 
-      {(isGenerating || generatedPlan) && (
-        <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
-          <CardHeader>
-            <CardTitle>Temporary Track Preview</CardTitle>
-            <CardDescription>Review the generated plan. This is a temporary preview.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isGenerating ? (
-              <div className="space-y-4">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-8 w-3/4" />
-                <Skeleton className="h-8 w-4/5" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-8 w-3/4" />
-              </div>
+      <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
+        <CardHeader>
+          <CardTitle>Temporary Track Preview</CardTitle>
+          {generatedPlanDetails ? (
+              <CardDescription>
+                <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
+              </CardDescription>
             ) : (
-              generatedPlan && (
-                <Accordion type="single" collapsible className="w-full">
-                  {generatedPlan.map((item, index) => (
-                    <AccordionItem value={`item-${index}`} key={index}>
-                      <AccordionTrigger className="text-lg font-bold">
-                        {item.day}: {item.title}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <ul className="list-disc space-y-2 pl-6">
-                          {item.modules.map((module, moduleIndex) => (
-                            <li key={moduleIndex}>{module}</li>
-                          ))}
-                        </ul>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              )
+              <CardDescription>
+                Review the generated plan. This is a temporary preview.
+              </CardDescription>
             )}
-          </CardContent>
-        </Card>
-      )}
+        </CardHeader>
+        <CardContent>
+          {isGenerating ? (
+            <div className="space-y-4">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-8 w-4/5" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-8 w-3/4" />
+            </div>
+          ) : generatedPlanDetails ? (
+            <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
+              {generatedPlanDetails.plan.map((item, index) => (
+                <AccordionItem value={`item-${index}`} key={index}>
+                  <AccordionTrigger className="text-lg font-bold">
+                    {item.day}: {item.title}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="list-disc space-y-2 pl-6">
+                      {item.modules.map((module, moduleIndex) => (
+                        <li key={moduleIndex}>{module}</li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          ) : (
+            <div className="text-center text-muted-foreground italic py-8">
+              No plan generated yet. Complete the fields and click Generate.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <AlertDialog open={suggestedTopics.length > 0 && isClarifying}>
         <AlertDialogContent>
