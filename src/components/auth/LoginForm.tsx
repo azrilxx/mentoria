@@ -14,6 +14,7 @@ import { Eye, EyeOff, Loader2, AlertCircle, Mail } from 'lucide-react';
 import { signInUser, DEMO_USER, checkPendingInvite } from '@/lib/firebaseAuth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Please enter your username or email address'),
