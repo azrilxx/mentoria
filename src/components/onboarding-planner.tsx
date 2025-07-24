@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, ExternalLink } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useState, useTransition, useRef, useEffect } from "react";
@@ -50,6 +50,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   trainingFocus: z.string().min(2, {
@@ -66,6 +67,7 @@ interface DailyPlan {
   day: string;
   title: string;
   modules: string[];
+  sops: { title: string, url: string }[];
 }
 
 interface GeneratedPlanDetails extends OnboardingFormValues {
@@ -132,31 +134,40 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
 
   const parseLessonPlan = (planText: string): DailyPlan[] => {
     if (!planText) return [];
-    
+
     const dailyPlans: DailyPlan[] = [];
     const dayBlocks = planText.split(/Day \d+:/).filter(Boolean);
-
     const dayTitles = planText.match(/Day \d+:.*(?:\r\n|\r|\n)/g) || [];
 
     dayBlocks.forEach((block, index) => {
-      const titleMatch = dayTitles[index]?.trim().match(/Day (\d+): (.*)/i);
-      if (!titleMatch) return;
+        const titleMatch = dayTitles[index]?.trim().match(/Day (\d+): (.*)/i);
+        if (!titleMatch) return;
 
-      const dayNumber = titleMatch[1];
-      const dayTitle = titleMatch[2];
-      
-      const modules = block.split('\n')
-        .map(line => line.trim())
-        .filter(line => line.startsWith('- ') || line.startsWith('* '))
-        .map(line => line.substring(2).trim());
+        const dayNumber = titleMatch[1];
+        const dayTitle = titleMatch[2];
 
-      if (modules.length > 0) {
-        dailyPlans.push({
-          day: `Day ${dayNumber}`,
-          title: dayTitle,
-          modules: modules,
-        });
-      }
+        const modules = block.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('- '))
+            .map(line => line.substring(2).trim());
+
+        const sopBlock = block.split('Related SOPs:')[1] || '';
+        const sops = (sopBlock.match(/- SOP Document: (.*?)\s\(link: (.*?)\)/g) || [])
+          .map(line => {
+              const match = line.match(/- SOP Document: (.*?)\s\(link: (.*?)\)/);
+              return match ? { title: match[1], url: match[2] } : null;
+          })
+          .filter((sop): sop is { title: string, url: string } => sop !== null);
+
+
+        if (modules.length > 0) {
+            dailyPlans.push({
+                day: `Day ${dayNumber}`,
+                title: dayTitle,
+                modules: modules,
+                sops: sops
+            });
+        }
     });
 
     return dailyPlans;
@@ -334,74 +345,88 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                 <CardDescription>
                   <strong>Onboarding Track: {generatedPlanDetails.trainingFocus}</strong> ({generatedPlanDetails.duration} days, {generatedPlanDetails.seniorityLevel} level, {generatedPlanDetails.learningScope})
                 </CardDescription>
-              ) : (
+            ) : (
                 <CardDescription>
-                  Review the generated plan. This is a temporary preview.
+                  No plan generated yet. Complete the fields and click Generate.
                 </CardDescription>
-              )}
+            )}
           </CardHeader>
           <CardContent>
-            {isGenerating ? (
-              <div className="space-y-4">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-8 w-3/4" />
-                <Skeleton className="h-8 w-4/5" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-8 w-3/4" />
-              </div>
+            {isLoading ? (
+                <div className="space-y-4">
+                    <Skeleton className="h-10 w-full" />
+                    <div className="space-y-2 pl-4">
+                        <Skeleton className="h-4 w-4/5" />
+                        <Skeleton className="h-4 w-3/5" />
+                    </div>
+                     <Skeleton className="h-10 w-full" />
+                </div>
             ) : generatedPlanDetails && generatedPlanDetails.plan.length > 0 ? (
-              <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
+              <Accordion type="single" collapsible defaultValue="item-0" className="w-full">
                 {generatedPlanDetails.plan.map((item, index) => (
-                  <AccordionItem value={`item-${index}`} key={index}>
-                    <AccordionTrigger className="text-lg font-bold">
-                      {item.day}: {item.title}
-                    </AccordionTrigger>
+                  <AccordionItem value={`item-${index}`} key={item.day}>
+                    <AccordionTrigger>{`${item.day}: ${item.title}`}</AccordionTrigger>
                     <AccordionContent>
                       <ul className="list-disc space-y-2 pl-6">
                         {item.modules.map((module, moduleIndex) => (
                           <li key={moduleIndex}>{module}</li>
                         ))}
                       </ul>
+                      {item.sops && item.sops.length > 0 && (
+                        <>
+                           <Separator className="my-4" />
+                           <div className="space-y-2">
+                                <h4 className="font-semibold">Related SOPs</h4>
+                                <ul className="list-none space-y-1 pl-1">
+                                    {item.sops.map((sop, sopIndex) => (
+                                       <li key={sopIndex} className="text-sm">
+                                            <a
+                                                href={sop.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center text-primary hover:underline"
+                                            >
+                                               {sop.title} <ExternalLink className="ml-2 h-4 w-4" />
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                           </div>
+                        </>
+                      )}
                     </AccordionContent>
                   </AccordionItem>
                 ))}
               </Accordion>
-            ) : generatedPlanDetails && generatedPlanDetails.plan.length === 0 ? (
-              <div className="text-center text-muted-foreground italic py-8">
-                 No training modules found for the selected criteria.
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground italic py-8">
-                No plan generated yet. Complete the fields and click Generate.
-              </div>
-            )}
+            ) : generatedPlanDetails ? (
+              <p className="text-muted-foreground">
+                No training modules found for the selected criteria.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
 
-
-      <AlertDialog open={isClarifying && suggestedTopics.length > 0}>
+      <AlertDialog open={isClarifying && suggestedTopics.length > 0} onOpenChange={setIsClarifying}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clarify Training Focus</AlertDialogTitle>
+            <AlertDialogTitle>Did you mean...?</AlertDialogTitle>
             <AlertDialogDescription>
-              You entered '{originalTopic}'. Did you mean one of these?
+              You entered &quot;{originalTopic}&quot;. Please select a more specific topic:
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col space-y-2">
-            {isClarifying && !suggestedTopics.length ? (
-               <div className="flex items-center justify-center p-4">
-                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
-               </div>
-            ) : (
-              suggestedTopics.map((topic) => (
-                <AlertDialogAction key={topic} onClick={() => handleTopicSelection(topic)}>
-                  {topic}
-                </AlertDialogAction>
-              ))
-            )}
+            {suggestedTopics.map((topic) => (
+              <AlertDialogAction
+                key={topic}
+                onClick={() => handleTopicSelection(topic)}
+                className="justify-start"
+              >
+                {topic}
+              </AlertDialogAction>
+            ))}
           </div>
-           <AlertDialogCancel onClick={closeClarificationDialog}>Keep my input</AlertDialogCancel>
+          <AlertDialogCancel onClick={closeClarificationDialog}>Cancel</AlertDialogCancel>
         </AlertDialogContent>
       </AlertDialog>
     </>

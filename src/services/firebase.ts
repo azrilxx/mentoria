@@ -50,6 +50,20 @@ export const CustomModuleSchema = z.object({
 });
 export type CustomModule = z.infer<typeof CustomModuleSchema>;
 
+// `sops` collection
+export const SopSchema = z.object({
+    id: z.string().optional(),
+    companyId: z.string(),
+    uploadedBy: z.string(),
+    department: z.string(),
+    tags: z.array(z.string()),
+    fileUrl: z.string(),
+    fileName: z.string(),
+    createdAt: z.string(),
+});
+export type Sop = z.infer<typeof SopSchema>;
+
+
 // `onboardingTracks` collection
 export const OnboardingTrackSchema = z.object({
   id: z.string().optional(),
@@ -60,6 +74,7 @@ export const OnboardingTrackSchema = z.object({
   companyId: z.string(),
   resolvedLaws: z.array(z.string()),
   includedCustomModules: z.array(z.string()),
+  includedSops: z.array(z.string()).optional(),
   generatedModules: z.array(z.any()), // Can be more specific later
   generatedPlanText: z.string(),
   createdAt: z.string(),
@@ -122,6 +137,20 @@ const MOCK_CUSTOM_MODULES: (CustomModule & { companyId: string })[] = [
     }
 ];
 
+const MOCK_SOPS: Sop[] = [
+    {
+        id: 'sop_audit_1',
+        companyId: 'desaria-group-123',
+        uploadedBy: 'hr_admin_user',
+        department: 'Finance',
+        tags: ['audit', 'compliance'],
+        fileUrl: '/sops/desaria-group-123/Internal_Audit_Checklist.pdf',
+        fileName: 'Internal_Audit_Checklist.pdf',
+        createdAt: new Date().toISOString(),
+    }
+];
+
+
 const MOCK_ONBOARDING_TRACKS: OnboardingTrack[] = [];
 
 
@@ -148,6 +177,44 @@ export async function getCustomModulesByTags(companyId: string, tags: string[]):
         (tags.length === 0 || tags.some(tag => module.domainTags.includes(tag.toLowerCase())))
     );
 }
+
+export async function getSopsByTags(companyId: string, tags: string[]): Promise<Sop[]> {
+    console.log(`Fetching SOPs for company ${companyId} with tags: ${tags.join(', ')}`);
+    return MOCK_SOPS.filter(sop =>
+        sop.companyId === companyId &&
+        (tags.length === 0 || tags.some(tag => sop.tags.includes(tag.toLowerCase())))
+    );
+}
+
+export async function getSopsByCompany(companyId: string): Promise<Sop[]> {
+    console.log(`Fetching all SOPs for company ${companyId}`);
+    return MOCK_SOPS.filter(sop => sop.companyId === companyId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function saveSop(sopData: Omit<Sop, 'id' | 'createdAt'>): Promise<string> {
+    console.log(`Saving new SOP: ${sopData.fileName}`);
+    const newSop: Sop = {
+        ...sopData,
+        id: `sop_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+    };
+    MOCK_SOPS.push(newSop);
+    console.log(`Saved SOP with ID: ${newSop.id}`);
+    return newSop.id!;
+}
+
+export async function deleteSop(sopId: string): Promise<void> {
+    console.log(`Deleting SOP with ID: ${sopId}`);
+    const index = MOCK_SOPS.findIndex(s => s.id === sopId);
+    if (index > -1) {
+        MOCK_SOPS.splice(index, 1);
+        console.log(`SOP deleted.`);
+    } else {
+        console.warn(`SOP with ID ${sopId} not found.`);
+        throw new Error("SOP not found");
+    }
+}
+
 
 export async function saveOnboardingTrack(trackData: Omit<OnboardingTrack, 'id' | 'createdAt'>): Promise<string> {
     console.log(`Saving new onboarding track for focus: ${trackData.trainingFocus}`);

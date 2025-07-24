@@ -12,9 +12,11 @@ import {z} from 'genkit';
 import {
   getLawsByTags,
   getCustomModulesByTags,
+  getSopsByTags,
   saveOnboardingTrack,
   Law,
   CustomModule,
+  Sop,
 } from '@/services/firebase';
 
 const GenerateLessonPlanInputSchema = z.object({
@@ -66,11 +68,18 @@ const CustomModuleSchema = z.object({
   content: z.string(),
 });
 
+const SopSchema = z.object({
+  id: z.string(),
+  fileName: z.string(),
+  fileUrl: z.string(),
+});
+
 const PromptInputSchema = z.intersection(
   GenerateLessonPlanInputSchema,
   z.object({
     laws: z.string().optional(),
     customModules: z.string().optional(),
+    sops: z.string().optional(),
   })
 );
 
@@ -94,7 +103,7 @@ const prompt = ai.definePrompt({
 Your task is to generate a {{duration}}-day onboarding track about "{{trainingFocus}}".
 The audience is at the {{seniorityLevel}} level, and the goal is {{learningScope}}.
 
-Use the following sources to build the daily modules. Prioritize official laws, then supplement with company-specific modules.
+Use the following sources to build the daily modules. Prioritize official laws, then supplement with company-specific modules and SOPs.
 
 {{#if laws}}
 Available Malaysian Laws:
@@ -106,14 +115,20 @@ Available Company-Specific Modules (SOPs, rules):
 {{{customModules}}}
 {{/if}}
 
+{{#if sops}}
+Available Company Documents (SOPs):
+{{{sops}}}
+{{/if}}
+
 INSTRUCTIONS:
 1. Create a day-by-day training plan for the specified {{duration}}.
 2. For each day, create a clear title (e.g., "Day 1: Introduction to the Strata Management Act").
 3. For each day, list 2-4 specific modules as bullet points. Each module MUST start with '- '.
 4. Each module must be derived from the provided Law Sections or Company SOPs. You can summarize or rephrase, but stick to the source material.
-5. Ensure the complexity of the modules matches the {{seniorityLevel}} and {{learningScope}}.
-6. The tone must be professional and suitable for a Malaysian corporate environment.
-7. Output the entire plan as a single block of text, using markdown for formatting (e.g., Day 1: ..., - Module...).
+5. If relevant Company Documents (SOPs) are available, add a section at the end of the day's modules titled "Related SOPs:" and list the relevant document titles.
+6. Ensure the complexity of the modules matches the {{seniorityLevel}} and {{learningScope}}.
+7. The tone must be professional and suitable for a Malaysian corporate environment.
+8. Output the entire plan as a single block of text, using markdown for formatting (e.g., Day 1: ..., - Module...).
 `,
 });
 
@@ -128,9 +143,10 @@ const generateLessonPlanFlow = ai.defineFlow(
     // A real app might have a more sophisticated mapping.
     const domainTags = [input.trainingFocus.toLowerCase().replace(/ /g, '')];
 
-    const [relevantLaws, customModules] = await Promise.all([
+    const [relevantLaws, customModules, relevantSops] = await Promise.all([
       getLawsByTags(domainTags),
       getCustomModulesByTags(input.companyId, domainTags),
+      getSopsByTags(input.companyId, domainTags),
     ]);
     
     const lawsText = relevantLaws
@@ -147,11 +163,16 @@ const generateLessonPlanFlow = ai.defineFlow(
     const customModulesText = customModules
       .map(m => `- SOP: ${m.title}\n  Content: ${m.content}`)
       .join('\n');
+      
+    const sopsText = relevantSops
+      .map(s => `- SOP Document: ${s.fileName} (link: ${s.fileUrl})`)
+      .join('\n');
 
     const promptInput = {
       ...input,
       laws: lawsText,
       customModules: customModulesText,
+      sops: sopsText,
     };
 
     const {output} = await prompt(promptInput);
@@ -164,6 +185,7 @@ const generateLessonPlanFlow = ai.defineFlow(
       ...input,
       resolvedLaws: relevantLaws.map(l => l.id),
       includedCustomModules: customModules.map(m => m.id),
+      includedSops: relevantSops.map(s => s.id!),
       generatedModules: [], // This could be populated by a more complex parsing of the output
       generatedPlanText: output.lessonPlan,
     });
