@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Clock, User, ExternalLink, Loader2 } from 'lucide-react';
+import { Calendar, Clock, User, ExternalLink, Loader2, CheckCircle } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -93,7 +93,8 @@ export function MyPlans({ companyId }: MyPlansProps) {
     );
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -158,7 +159,7 @@ export function MyPlans({ companyId }: MyPlansProps) {
                   description: "In a full implementation, this would switch to the Generate Plan tab.",
                 });
               }}
-              className="bg-[#74b49b] hover:bg-[#5a9b84] text-white"
+              className="bg-primary hover:bg-primary/90"
             >
               Generate Your First Plan
             </Button>
@@ -192,26 +193,25 @@ export function MyPlans({ companyId }: MyPlansProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <Clock className="h-4 w-4" />
                   <span>{formatDuration(plan.duration)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Calendar className="h-4 w-4" />
                   <span>Created {formatDate(plan.generatedAt)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
+                  <User className="h-4 w-4" />
                   <span>Last viewed {formatDate(plan.lastViewed)}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {plan.confirmedAt && (
-                    <span className="text-green-600 text-xs">
-                      Confirmed {formatDate(plan.confirmedAt)}
-                    </span>
-                  )}
-                </div>
+                {plan.confirmedAt && (
+                  <div className="flex items-center gap-2 text-green-600">
+                     <CheckCircle className="h-4 w-4" />
+                     <span>Confirmed {formatDate(plan.confirmedAt)}</span>
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-2 mt-4">
@@ -238,7 +238,7 @@ export function MyPlans({ companyId }: MyPlansProps) {
                 {plan.status === 'draft' && (
                   <Button
                     size="sm"
-                    className="bg-[#74b49b] hover:bg-[#5a9b84] text-white"
+                    className="bg-primary hover:bg-primary/90"
                     onClick={async () => {
                       try {
                         await ProgressTrackingService.confirmPlan(userId, plan.trackId);
