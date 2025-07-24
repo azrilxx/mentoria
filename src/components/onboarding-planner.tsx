@@ -259,7 +259,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
     <>
       <Card className="w-full shadow-lg border-2 border-border/50">
         <CardHeader>
-          <CardTitle>Lesson Plan Generator</CardTitle>
+          <CardTitle>LaunchPad</CardTitle>
           <CardDescription>
             Define a new training track for your team. Start with a topic.
           </CardDescription>
@@ -474,7 +474,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
                 <Button 
                   onClick={handleConfirmPlan} 
                   disabled={isConfirmed || isConfirming}
-                  className="bg-[#74b49b] hover:bg-[#5a9b84] text-white"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   {isConfirming ? (
                     <>
@@ -551,7 +551,7 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
         ) : (
             <Card className="mt-8 w-full shadow-lg border-2 border-border/50">
                  <CardHeader>
-                    <CardTitle>Temporary Track Preview</CardTitle>
+                    <CardTitle>LaunchPad Preview</CardTitle>
                      <CardDescription>
                        No plan generated yet. Complete the fields and click Generate.
                     </CardDescription>
@@ -590,3 +590,5 @@ export function OnboardingPlanner({ companyId }: { companyId: string }) {
     </>
   );
 }
+
+    

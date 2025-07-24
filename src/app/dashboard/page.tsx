@@ -204,7 +204,7 @@ export default function DashboardPage() {
 
         <Tabs defaultValue="generate" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="generate">Generate Plan</TabsTrigger>
+            <TabsTrigger value="generate">LaunchPad</TabsTrigger>
             <TabsTrigger value="my-plans">My Plans</TabsTrigger>
           </TabsList>
           <TabsContent value="generate" className="mt-8">
@@ -218,3 +218,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

@@ -152,7 +152,7 @@ export function MyPlans({ companyId }: MyPlansProps) {
         <CardContent>
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">
-              No training plans found. Generate your first plan to get started!
+              No tracks generated yet. Create your first plan in the LaunchPad!
             </p>
           </div>
         </CardContent>
@@ -227,3 +227,5 @@ export function MyPlans({ companyId }: MyPlansProps) {
     </div>
   );
 }
+
+    
