@@ -23,7 +23,7 @@ import type { DailyPlan, SopLink } from '@/lib/schemas';
 export { type DailyPlan, type SopLink };
 
 
-export const GenerateLessonPlanInputSchema = z.object({
+const GenerateLessonPlanInputSchema = z.object({
   trainingFocus: z
     .string()
     .describe('The main topic or focus of the training.'),
